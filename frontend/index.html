@@ -1,0 +1,865 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TMC Corridor Tool</title>
+<style>
+  :root {
+    --bg: #1a1a2e; --surface: #16213e; --surface2: #0f3460;
+    --accent: #e94560; --text: #eaeaea; --muted: #8892a4;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: var(--text); height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
+
+  /* ── Topbar ── */
+  #topbar { display: flex; align-items: center; gap: 10px; padding: 7px 14px; background: var(--surface); border-bottom: 1px solid #2a2a4a; flex-shrink: 0; flex-wrap: wrap; }
+  #topbar h1 { font-size: 14px; font-weight: 700; color: var(--accent); white-space: nowrap; letter-spacing: .5px; }
+  .sep { width: 1px; height: 22px; background: #2a2a4a; }
+  button, select, input[type=number], input[type=text] {
+    background: var(--surface2); color: var(--text); border: 1px solid #2a2a4a;
+    border-radius: 5px; padding: 5px 10px; font-size: 12px; cursor: pointer; font-family: inherit;
+  }
+  button:hover { background: #1a4a80; border-color: #4a6aaa; }
+  .btn-accent { background: var(--accent); border-color: var(--accent); font-weight: 600; }
+  .btn-accent:hover { background: #c73350; border-color: #c73350; }
+  .seg { display: flex; }
+  .seg button { border-radius: 0; border-right-width: 0; padding: 5px 14px; }
+  .seg button:first-child { border-radius: 5px 0 0 5px; }
+  .seg button:last-child  { border-radius: 0 5px 5px 0; border-right-width: 1px; }
+  .seg button.on { background: #1e5aaa; border-color: #5a8adf; color: #a0c8ff; font-weight: 700; }
+  #proj-label { font-size: 12px; color: var(--muted); max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  #tol-wrap { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); }
+  #tol-input { width: 52px; padding: 5px 6px; text-align: center; }
+
+  /* ── Overlays ── */
+  .overlay { position: fixed; inset: 0; background: rgba(0,0,0,.75); display: flex; align-items: center; justify-content: center; z-index: 500; }
+  .box { background: var(--surface); border: 1px solid #2a2a4a; border-radius: 10px; padding: 28px 30px; display: flex; flex-direction: column; gap: 14px; min-width: 380px; max-width: 480px; }
+  .box h2 { font-size: 15px; font-weight: 700; }
+  .box input[type=text], .box input[type=file] { background: var(--bg); border: 1px solid #2a2a4a; border-radius: 6px; color: var(--text); padding: 8px 10px; font-size: 13px; font-family: inherit; width: 100%; }
+  .box input[type=file] { padding: 6px; border-style: dashed; cursor: pointer; }
+  .field { display: flex; flex-direction: column; gap: 5px; }
+  .field label { font-size: 11px; color: var(--muted); font-weight: 600; text-transform: uppercase; letter-spacing: .5px; }
+  .row { display: flex; gap: 8px; }
+  #proj-list { display: flex; flex-direction: column; gap: 6px; max-height: 240px; overflow-y: auto; }
+  .proj-item { display: flex; align-items: center; justify-content: space-between; background: var(--surface2); border: 1px solid #2a2a4a; border-radius: 7px; padding: 10px 13px; cursor: pointer; }
+  .proj-item:hover { border-color: #5a8adf; }
+  .proj-item b { font-size: 13px; }
+  .proj-item small { color: var(--muted); font-size: 11px; }
+  .proj-del { background: transparent !important; border: none !important; color: #ef4444; font-size: 18px; padding: 0 4px; opacity: .6; line-height: 1; }
+  .proj-del:hover { opacity: 1; background: transparent !important; }
+  #upload-status { font-size: 12px; color: var(--muted); min-height: 18px; }
+
+  /* ── Edit drawer ── */
+  #edit-drawer {
+    position: fixed; top: 0; right: -380px; width: 360px; height: 100vh;
+    background: var(--surface); border-left: 1px solid #2a2a4a;
+    display: flex; flex-direction: column;
+    transition: right .25s ease; z-index: 400; overflow: hidden;
+  }
+  #edit-drawer.open { right: 0; }
+  #edit-header { display: flex; align-items: center; justify-content: space-between; padding: 14px 16px; border-bottom: 1px solid #2a2a4a; flex-shrink: 0; }
+  #edit-title { font-size: 13px; font-weight: 700; }
+  #edit-close { background: transparent; border: none; color: var(--muted); font-size: 20px; cursor: pointer; padding: 0; line-height: 1; }
+  #edit-close:hover { color: var(--text); background: transparent; }
+  #edit-body { flex: 1; overflow-y: auto; padding: 14px 16px; display: flex; flex-direction: column; gap: 12px; }
+  .edit-section-label { font-size: 10px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .8px; margin-top: 4px; }
+  .edit-grid { display: grid; grid-template-columns: 80px 1fr 1fr; gap: 6px; align-items: center; }
+  .edit-grid .hdr { font-size: 10px; color: var(--muted); font-weight: 600; text-align: center; }
+  .edit-grid .flabel { font-size: 12px; color: var(--text); }
+  .edit-grid input { background: var(--bg); border: 1px solid #2a2a4a; border-radius: 4px; color: var(--text); padding: 4px 7px; font-size: 12px; font-family: inherit; width: 100%; text-align: right; }
+  .edit-grid input:focus { outline: none; border-color: #5a8adf; }
+  .edit-grid input.changed { border-color: #f97316; }
+  #edit-footer { padding: 12px 16px; border-top: 1px solid #2a2a4a; display: flex; gap: 8px; flex-shrink: 0; }
+
+  /* ── Canvas ── */
+  #canvas-wrap { flex: 1; position: relative; overflow: hidden; cursor: default; }
+  #canvas-wrap.panning { cursor: grabbing; }
+  #canvas-wrap.connecting { cursor: crosshair; }
+  #world { position: absolute; top: 0; left: 0; transform-origin: 0 0; }
+  #svg-layer { position: absolute; top: 0; left: 0; pointer-events: none; overflow: visible; }
+
+  /* ── Cards ── */
+  .card { position: absolute; width: 260px; height: 260px; border-radius: 8px; overflow: visible; user-select: none; cursor: grab; }
+  .card:active { cursor: grabbing; }
+  .card-inner { width: 100%; height: 100%; border-radius: 8px; overflow: hidden; background: #fff; box-shadow: 0 3px 16px rgba(0,0,0,.5); }
+  .card-inner svg { width: 100%; height: 100%; display: block; }
+  .card-label { position: absolute; bottom: -22px; left: 0; right: 0; text-align: center; font-size: 10px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; pointer-events: none; }
+  .card-edit-btn { position: absolute; top: -10px; right: -10px; width: 24px; height: 24px; border-radius: 50%; background: #1e5aaa; border: 2px solid var(--bg); color: white; font-size: 13px; display: flex; align-items: center; justify-content: center; cursor: pointer; opacity: 0; transition: opacity .15s; pointer-events: all; z-index: 20; }
+  .card:hover .card-edit-btn { opacity: 1; }
+
+  /* Ports */
+  .port { position: absolute; width: 13px; height: 13px; border-radius: 50%; background: #3b82f6; border: 2px solid white; transform: translate(-50%,-50%); opacity: 0; transition: opacity .12s; cursor: crosshair; pointer-events: all; z-index: 10; }
+  .card:hover .port { opacity: 1; }
+  .port.lit { opacity: 1 !important; background: #22c55e; }
+  .port[data-side=top]    { top: 0;    left: 50%; }
+  .port[data-side=right]  { top: 50%;  left: 100%; }
+  .port[data-side=bottom] { top: 100%; left: 50%; }
+  .port[data-side=left]   { top: 50%;  left: 0; }
+
+  /* ── Connectors ── */
+  .conn-path { fill: none; stroke-width: 6; stroke-linecap: round; stroke-linejoin: round; }
+  .conn-hit  { fill: none; stroke: transparent; stroke-width: 22; cursor: pointer; pointer-events: stroke; }
+  .conn-del { position: absolute; width: 18px; height: 18px; border-radius: 50%; background: #ef4444; border: 2px solid white; color: white; font-size: 12px; font-weight: 700; display: flex; align-items: center; justify-content: center; cursor: pointer; transform: translate(-50%,-50%); pointer-events: all; }
+
+  /* ── Empty state ── */
+  #empty { position: absolute; inset: 0; display: none; flex-direction: column; align-items: center; justify-content: center; gap: 12px; color: var(--muted); pointer-events: none; }
+  #empty p { font-size: 13px; }
+
+  /* ── Status bar ── */
+  #statusbar { display: flex; align-items: center; gap: 14px; padding: 3px 14px; background: var(--surface); border-top: 1px solid #2a2a4a; font-size: 11px; color: var(--muted); flex-shrink: 0; }
+  #status-zoom { min-width: 48px; }
+  #status-hint { margin-left: auto; }
+
+  /* ── Toast ── */
+  #toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%) translateY(50px); background: #1e3a5f; color: var(--text); padding: 8px 18px; border-radius: 7px; font-size: 12px; transition: transform .25s; z-index: 9999; pointer-events: none; border: 1px solid #3a6aaf; }
+  #toast.show { transform: translateX(-50%) translateY(0); }
+  .spinner { display: inline-block; width: 13px; height: 13px; border: 2px solid #3a3a5a; border-top-color: #5a8adf; border-radius: 50%; animation: spin .7s linear infinite; vertical-align: middle; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+</style>
+</head>
+<body>
+
+<!-- Project picker -->
+<div class="overlay" id="proj-overlay">
+  <div class="box" style="min-width:420px">
+    <h2>TMC Corridor Tool</h2>
+    <div id="proj-list"><div style="color:var(--muted);font-size:12px;text-align:center;padding:12px">Loading…</div></div>
+    <div class="row" style="margin-top:4px">
+      <input type="text" id="new-proj-input" placeholder="New project name…" style="flex:1" />
+      <button class="btn-accent" onclick="createProject()">Create</button>
+    </div>
+  </div>
+</div>
+
+<!-- Upload overlay -->
+<div class="overlay" id="upload-overlay" style="display:none">
+  <div class="box">
+    <h2>Upload Data</h2>
+    <div class="field"><label>SVG Template</label><input type="file" id="svg-file" accept=".svg" /></div>
+    <div class="field"><label>Volume CSV</label><input type="file" id="csv-file" accept=".csv" /></div>
+    <div id="upload-status"></div>
+    <div class="row" style="justify-content:flex-end">
+      <button onclick="closeUpload()">Cancel</button>
+      <button class="btn-accent" onclick="doUpload()">Process &amp; Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- Edit drawer -->
+<div id="edit-drawer">
+  <div id="edit-header">
+    <span id="edit-title">Edit Volumes</span>
+    <button id="edit-close" onclick="closeEdit()">×</button>
+  </div>
+  <div id="edit-body">
+    <!-- populated by openEdit() -->
+  </div>
+  <div id="edit-footer">
+    <button onclick="closeEdit()" style="flex:1">Cancel</button>
+    <button class="btn-accent" onclick="saveEdit()" style="flex:2">Save Changes</button>
+  </div>
+</div>
+
+<!-- Topbar -->
+<div id="topbar">
+  <h1>TMC CORRIDOR</h1>
+  <div class="sep"></div>
+  <span id="proj-label">No project</span>
+  <button onclick="showProjPicker()">Projects</button>
+  <button onclick="openUpload()">Upload Data</button>
+  <div class="sep"></div>
+  <div class="seg">
+    <button id="btn-am" class="on" onclick="setScenario('am')">AM</button>
+    <button id="btn-pm"            onclick="setScenario('pm')">PM</button>
+  </div>
+  <div class="sep"></div>
+  <div id="tol-wrap">
+    Tolerance <input type="number" id="tol-input" value="5" min="0" max="50" step="1" title="Balance tolerance %" /> %
+  </div>
+  <div class="sep"></div>
+  <button onclick="autoArrange()">Auto Arrange</button>
+  <button onclick="fitView()">Fit</button>
+  <button class="btn-accent" onclick="exportCSV()">Export CSV</button>
+</div>
+
+<!-- Canvas -->
+<div id="canvas-wrap">
+  <div id="world">
+    <svg id="svg-layer" width="8000" height="8000"></svg>
+  </div>
+  <div id="empty">
+    <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" style="opacity:.15"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="12" y1="3" x2="12" y2="21"/></svg>
+    <p>Upload a CSV to populate this project's intersections.</p>
+  </div>
+  <div id="del-btns" style="position:absolute;top:0;left:0;pointer-events:none"></div>
+</div>
+
+<!-- Status bar -->
+<div id="statusbar">
+  <span id="status-zoom">100%</span>
+  <span>|</span>
+  <span>Scroll = zoom &nbsp;·&nbsp; Alt+drag = pan &nbsp;·&nbsp; Hover card = ports &nbsp;·&nbsp; ✏️ button = edit volumes</span>
+  <span id="status-hint"></span>
+</div>
+
+<div id="toast"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script>
+// ════════════════════════════════════════════════
+// CONFIG
+// ════════════════════════════════════════════════
+const SB_URL  = 'https://uvotunzymzabwjylxxiy.supabase.co';
+const SB_ANON = 'sb_publishable_lLl21XtkA9oUi09BYp8A-A_UyZSMe4o';
+
+const { createClient } = supabase;
+const sb = createClient(SB_URL, SB_ANON);
+
+// ════════════════════════════════════════════════
+// STATE
+// ════════════════════════════════════════════════
+let project  = null;
+let scenario = 'am';
+let cards    = {};   // id → { el, data }
+let conns    = [];
+let connFrom = null;
+let dragging = null;
+let panning  = false, panOrigin = null;
+let scale = 1, tx = 0, ty = 0;
+let editingId = null;  // card id currently in edit drawer
+
+const world    = document.getElementById('world');
+const svgLayer = document.getElementById('svg-layer');
+const wrap     = document.getElementById('canvas-wrap');
+const delBtns  = document.getElementById('del-btns');
+
+function getTolerance() {
+  return parseFloat(document.getElementById('tol-input').value) || 5;
+}
+
+document.getElementById('tol-input').addEventListener('change', redrawConns);
+
+// ════════════════════════════════════════════════
+// PROJECT PICKER
+// ════════════════════════════════════════════════
+async function showProjPicker() {
+  document.getElementById('proj-overlay').style.display = 'flex';
+  const list = document.getElementById('proj-list');
+  list.innerHTML = '<div style="color:var(--muted);font-size:12px;text-align:center;padding:12px">Loading…</div>';
+  const { data } = await sb.from('projects').select('*').order('created_at', { ascending: false });
+  list.innerHTML = '';
+  if (!data?.length) {
+    list.innerHTML = '<div style="color:var(--muted);font-size:12px;text-align:center;padding:12px">No projects yet.</div>';
+    return;
+  }
+  data.forEach(p => {
+    const item = document.createElement('div');
+    item.className = 'proj-item';
+    item.innerHTML = `<div><b>${esc(p.name)}</b><br><small>${new Date(p.created_at).toLocaleDateString()}</small></div>
+      <button class="proj-del" onclick="event.stopPropagation();deleteProject('${p.id}')">×</button>`;
+    item.onclick = () => openProject(p);
+    list.appendChild(item);
+  });
+}
+
+async function createProject() {
+  const name = document.getElementById('new-proj-input').value.trim();
+  if (!name) return;
+  const { data, error } = await sb.from('projects').insert({ name }).select().single();
+  if (error) { toast('Error: ' + error.message); return; }
+  document.getElementById('new-proj-input').value = '';
+  openProject(data);
+}
+
+async function deleteProject(id) {
+  if (!confirm('Delete this project and all its data?')) return;
+  await sb.from('projects').delete().eq('id', id);
+  if (project?.id === id) { project = null; document.getElementById('proj-label').textContent = 'No project'; clearCanvas(); }
+  showProjPicker();
+}
+
+async function openProject(p) {
+  project = p;
+  document.getElementById('proj-overlay').style.display = 'none';
+  document.getElementById('proj-label').textContent = p.name;
+  await loadCanvas();
+  subscribeRealtime();
+}
+
+// ════════════════════════════════════════════════
+// CANVAS
+// ════════════════════════════════════════════════
+async function loadCanvas() {
+  clearCanvas();
+  const [{ data: ints }, { data: connData }] = await Promise.all([
+    sb.from('intersections').select('*').eq('project_id', project.id).order('sort_order'),
+    sb.from('connectors').select('*').eq('project_id', project.id),
+  ]);
+  document.getElementById('empty').style.display = (ints?.length) ? 'none' : 'flex';
+  ints?.forEach(addCard);
+  connData?.forEach(c => { conns.push(c); renderConn(c); });
+}
+
+function clearCanvas() {
+  Object.values(cards).forEach(c => c.el.remove());
+  cards = {}; conns = [];
+  svgLayer.innerHTML = ''; delBtns.innerHTML = '';
+  addDefs();
+}
+
+// ════════════════════════════════════════════════
+// CARDS
+// ════════════════════════════════════════════════
+function addCard(data) {
+  const el = document.createElement('div');
+  el.className = 'card';
+  el.id = 'card-' + data.id;
+  el.style.left = data.x + 'px';
+  el.style.top  = data.y + 'px';
+  el.innerHTML = `
+    <div class="card-inner"><div class="svgholder">${svgFor(data)}</div></div>
+    <div class="card-label">#${esc(data.int_id)} &mdash; ${esc(data.ns_street)} &amp; ${esc(data.ew_street)}</div>
+    <button class="card-edit-btn" title="Edit volumes" onclick="event.stopPropagation();openEdit('${data.id}')">✏</button>
+    <div class="port" data-card="${data.id}" data-side="top"></div>
+    <div class="port" data-card="${data.id}" data-side="right"></div>
+    <div class="port" data-card="${data.id}" data-side="bottom"></div>
+    <div class="port" data-card="${data.id}" data-side="left"></div>
+  `;
+  el.addEventListener('mousedown', e => {
+    if (e.target.classList.contains('port') || e.target.classList.contains('card-edit-btn')) return;
+    e.preventDefault();
+    dragging = { id: data.id, sx: e.clientX, sy: e.clientY, cx: parseFloat(el.style.left), cy: parseFloat(el.style.top) };
+  });
+  world.appendChild(el);
+  cards[data.id] = { el, data };
+}
+
+function svgFor(d) {
+  return (scenario === 'pm' ? d.svg_pm : d.svg_am) || '';
+}
+
+function refreshCards() {
+  Object.values(cards).forEach(({ el, data }) => {
+    el.querySelector('.svgholder').innerHTML = svgFor(data);
+  });
+  redrawConns();
+}
+
+// ════════════════════════════════════════════════
+// EDIT DRAWER
+// ════════════════════════════════════════════════
+const VOL_FIELDS = ['EBL','EBT','EBR','WBL','WBT','WBR','NBL','NBT','NBR','SBL','SBT','SBR'];
+const DIR_GROUPS = [
+  { label: 'Eastbound',  fields: ['EBL','EBT','EBR'] },
+  { label: 'Westbound',  fields: ['WBL','WBT','WBR'] },
+  { label: 'Northbound', fields: ['NBL','NBT','NBR'] },
+  { label: 'Southbound', fields: ['SBL','SBT','SBR'] },
+];
+
+function openEdit(cardId) {
+  editingId = cardId;
+  const { data } = cards[cardId];
+  document.getElementById('edit-title').textContent = `#${data.int_id} — ${data.ns_street} & ${data.ew_street}`;
+
+  const body = document.getElementById('edit-body');
+  body.innerHTML = '';
+
+  DIR_GROUPS.forEach(({ label, fields }) => {
+    const sectionLabel = document.createElement('div');
+    sectionLabel.className = 'edit-section-label';
+    sectionLabel.textContent = label;
+    body.appendChild(sectionLabel);
+
+    const grid = document.createElement('div');
+    grid.className = 'edit-grid';
+    grid.innerHTML = `<div></div><div class="hdr">AM</div><div class="hdr">PM</div>`;
+
+    fields.forEach(f => {
+      const lbl = document.createElement('div');
+      lbl.className = 'flabel';
+      lbl.textContent = f;
+
+      const amVal = data.am_volumes?.[f] ?? '0';
+      const pmVal = data.pm_volumes?.[f] ?? '0';
+
+      const amIn = document.createElement('input');
+      amIn.type = 'number'; amIn.min = '0';
+      amIn.value = amVal;
+      amIn.dataset.field = f; amIn.dataset.period = 'am';
+      amIn.addEventListener('input', () => { amIn.classList.add('changed'); livePreview(); });
+
+      const pmIn = document.createElement('input');
+      pmIn.type = 'number'; pmIn.min = '0';
+      pmIn.value = pmVal;
+      pmIn.dataset.field = f; pmIn.dataset.period = 'pm';
+      pmIn.addEventListener('input', () => { pmIn.classList.add('changed'); livePreview(); });
+
+      grid.appendChild(lbl);
+      grid.appendChild(amIn);
+      grid.appendChild(pmIn);
+    });
+    body.appendChild(grid);
+  });
+
+  document.getElementById('edit-drawer').classList.add('open');
+}
+
+function closeEdit() {
+  document.getElementById('edit-drawer').classList.remove('open');
+  editingId = null;
+}
+
+function getEditedVolumes() {
+  const amVols = {}, pmVols = {};
+  document.querySelectorAll('#edit-body input').forEach(inp => {
+    const f = inp.dataset.field;
+    const v = String(Math.max(0, parseInt(inp.value) || 0));
+    if (inp.dataset.period === 'am') amVols[f] = v;
+    else pmVols[f] = v;
+  });
+  return { amVols, pmVols };
+}
+
+function livePreview() {
+  if (!editingId) return;
+  const { data } = cards[editingId];
+  const { amVols, pmVols } = getEditedVolumes();
+  // Merge with existing to get preview volumes
+  const previewAm = { ...data.am_volumes, ...amVols };
+  const previewPm = { ...data.pm_volumes, ...pmVols };
+  const previewData = { ...data, am_volumes: previewAm, pm_volumes: previewPm };
+  // Re-populate SVGs for preview (use stored template text if available; otherwise just show stale SVG)
+  // Delta badges update live
+  cards[editingId].data = previewData;
+  redrawConns();
+}
+
+async function saveEdit() {
+  if (!editingId) return;
+  const { data } = cards[editingId];
+  const { amVols, pmVols } = getEditedVolumes();
+
+  const newAm = { ...data.am_volumes, ...amVols };
+  const newPm = { ...data.pm_volumes, ...pmVols };
+  const bothVols = {};
+  VOL_FIELDS.forEach(f => { bothVols[f] = `${newAm[f] ?? '0'}(${newPm[f] ?? '0'})`; });
+
+  // Re-populate SVGs — requires original template
+  // We'll use the current svg_am as a base and splice new values in
+  let svgAm   = rebuildSvg(data.svg_am,   newAm);
+  let svgPm   = rebuildSvg(data.svg_pm,   newPm);
+  let svgBoth = rebuildSvg(data.svg_both, bothVols);
+
+  const updates = { am_volumes: newAm, pm_volumes: newPm, svg_am: svgAm, svg_pm: svgPm, svg_both: svgBoth };
+  const { error } = await sb.from('intersections').update(updates).eq('id', editingId);
+  if (error) { toast('Save failed: ' + error.message); return; }
+
+  cards[editingId].data = { ...data, ...updates };
+  cards[editingId].el.querySelector('.svgholder').innerHTML = svgFor(cards[editingId].data);
+  redrawConns();
+  closeEdit();
+  toast('Saved.');
+}
+
+// Re-splice values into an already-populated SVG string
+function rebuildSvg(svgStr, vols) {
+  if (!svgStr) return svgStr;
+  let svg = svgStr;
+  for (const [transform, field] of TMAP) {
+    const val = vols[field] ?? '0';
+    svg = spliceValue(svg, transform, val);
+  }
+  return svg;
+}
+
+// ════════════════════════════════════════════════
+// PORT / CONNECT
+// ════════════════════════════════════════════════
+document.addEventListener('click', e => {
+  const port = e.target.closest('.port');
+  if (!port) return;
+  e.stopPropagation();
+  const cardId = port.dataset.card, side = port.dataset.side;
+  if (!connFrom) {
+    connFrom = { cardId, side };
+    port.classList.add('lit');
+    wrap.classList.add('connecting');
+    setHint('Click another card\'s port — Esc to cancel');
+  } else {
+    if (connFrom.cardId === cardId) { cancelConn(); return; }
+    const dir = guessDir(connFrom.cardId, cardId);
+    persistConn(connFrom.cardId, connFrom.side, cardId, side, dir);
+    cancelConn();
+  }
+});
+
+document.addEventListener('keydown', e => { if (e.key === 'Escape') cancelConn(); });
+
+function cancelConn() {
+  document.querySelectorAll('.port.lit').forEach(p => p.classList.remove('lit'));
+  connFrom = null; wrap.classList.remove('connecting'); setHint('');
+}
+
+function guessDir(fromId, toId) {
+  const from = cards[fromId], to = cards[toId];
+  if (!from || !to) return 'eb';
+  const dx = parseFloat(to.el.style.left) - parseFloat(from.el.style.left);
+  const dy = parseFloat(to.el.style.top)  - parseFloat(from.el.style.top);
+  if (Math.abs(dx) >= Math.abs(dy)) return dx > 0 ? 'eb' : 'wb';
+  return dy > 0 ? 'sb' : 'nb';
+}
+
+async function persistConn(fromId, fromSide, toId, toSide, dir) {
+  const rec = { project_id: project.id, from_intersection_id: fromId, from_side: fromSide, to_intersection_id: toId, to_side: toSide, direction: dir };
+  const { data, error } = await sb.from('connectors').insert(rec).select().single();
+  if (error) { toast('Error saving connector'); return; }
+  conns.push(data); renderConn(data);
+}
+
+// ════════════════════════════════════════════════
+// CONNECTORS + DELTA BADGES
+// ════════════════════════════════════════════════
+const DIR_COLOR = { eb: '#3b82f6', wb: '#ef4444', nb: '#22c55e', sb: '#a855f7' };
+const THRU_KEY  = { eb: 'EBT', wb: 'WBT', nb: 'NBT', sb: 'SBT' };
+
+function addDefs() {
+  const defs = document.createElementNS('http://www.w3.org/2000/svg','defs');
+  ['eb','wb','nb','sb'].forEach(dir => {
+    const m = document.createElementNS('http://www.w3.org/2000/svg','marker');
+    m.setAttribute('id',`arr-${dir}`); m.setAttribute('markerWidth','7'); m.setAttribute('markerHeight','7');
+    m.setAttribute('refX','5'); m.setAttribute('refY','3'); m.setAttribute('orient','auto');
+    const p = document.createElementNS('http://www.w3.org/2000/svg','path');
+    p.setAttribute('d','M0,0 L0,6 L7,3 z'); p.setAttribute('fill', DIR_COLOR[dir]);
+    m.appendChild(p); defs.appendChild(m);
+  });
+  svgLayer.appendChild(defs);
+}
+
+function portPos(cardId, side) {
+  const c = cards[cardId]; if (!c) return { x:0,y:0 };
+  const x = parseFloat(c.el.style.left), y = parseFloat(c.el.style.top), S = 260;
+  if (side==='top')    return { x: x+S/2, y };
+  if (side==='bottom') return { x: x+S/2, y: y+S };
+  if (side==='left')   return { x, y: y+S/2 };
+  if (side==='right')  return { x: x+S, y: y+S/2 };
+  return { x, y };
+}
+
+function elbowPath(p1, s1, p2) {
+  const hori = s => s==='left'||s==='right';
+  if (hori(s1)) { const mx=(p1.x+p2.x)/2; return `M${p1.x},${p1.y} C${mx},${p1.y} ${mx},${p2.y} ${p2.x},${p2.y}`; }
+  const my=(p1.y+p2.y)/2; return `M${p1.x},${p1.y} C${p1.x},${my} ${p2.x},${my} ${p2.x},${p2.y}`;
+}
+
+function calcDelta(fromData, toData, dir) {
+  const key = THRU_KEY[dir]; if (!key||!fromData||!toData) return null;
+  const vols = d => scenario==='pm' ? d.pm_volumes : d.am_volumes;
+  const a = parseFloat(vols(fromData)?.[key]??0), b = parseFloat(vols(toData)?.[key]??0);
+  const avg = (a+b)/2; if (avg===0) return 0;
+  return (Math.abs(a-b)/avg)*100;
+}
+
+function renderConn(conn) {
+  const p1 = portPos(conn.from_intersection_id, conn.from_side);
+  const p2 = portPos(conn.to_intersection_id,   conn.to_side);
+  const color = DIR_COLOR[conn.direction]||'#999';
+  const d = elbowPath(p1, conn.from_side, p2);
+  const g = document.createElementNS('http://www.w3.org/2000/svg','g');
+  g.dataset.cid = conn.id;
+
+  const hit = document.createElementNS('http://www.w3.org/2000/svg','path');
+  hit.setAttribute('d',d); hit.classList.add('conn-hit');
+  const path = document.createElementNS('http://www.w3.org/2000/svg','path');
+  path.setAttribute('d',d); path.classList.add('conn-path');
+  path.setAttribute('stroke',color); path.setAttribute('marker-end',`url(#arr-${conn.direction})`);
+  g.appendChild(hit); g.appendChild(path);
+
+  // Delta badge
+  const fromData = cards[conn.from_intersection_id]?.data;
+  const toData   = cards[conn.to_intersection_id]?.data;
+  const delta = calcDelta(fromData, toData, conn.direction);
+  const tol   = getTolerance();
+  const mx = (p1.x+p2.x)/2, my = (p1.y+p2.y)/2;
+
+  if (delta !== null) {
+    const balanced = delta <= tol;
+    const badgeColor = balanced ? '#22c55e' : delta < tol*3 ? '#f97316' : '#ef4444';
+    const fo = document.createElementNS('http://www.w3.org/2000/svg','foreignObject');
+    fo.setAttribute('x', mx-26); fo.setAttribute('y', my-13);
+    fo.setAttribute('width','52'); fo.setAttribute('height','26');
+    const div = document.createElement('div');
+    div.style.cssText = `background:${badgeColor};color:#fff;border-radius:20px;font-size:10px;font-weight:700;text-align:center;line-height:26px;border:2px solid #fff;box-shadow:0 1px 5px rgba(0,0,0,.4);font-family:system-ui,sans-serif;`;
+    div.textContent = balanced ? '✓' : delta.toFixed(1)+'%';
+    fo.appendChild(div); g.appendChild(fo);
+  }
+
+  svgLayer.appendChild(g);
+
+  // Delete button
+  const btn = document.createElement('div');
+  btn.className = 'conn-del'; btn.dataset.cid = conn.id;
+  btn.textContent = '×'; btn.style.pointerEvents = 'all';
+  btn.onclick = e => { e.stopPropagation(); removeConn(conn.id); };
+  delBtns.appendChild(btn);
+  placeDelBtn(btn, mx, my-20);
+}
+
+function placeDelBtn(btn, wx, wy) {
+  btn.style.left = (wx*scale+tx)+'px'; btn.style.top = (wy*scale+ty)+'px';
+}
+
+function syncDelBtns() {
+  conns.forEach(c => {
+    const btn = delBtns.querySelector(`[data-cid="${c.id}"]`); if(!btn) return;
+    const p1 = portPos(c.from_intersection_id, c.from_side);
+    const p2 = portPos(c.to_intersection_id,   c.to_side);
+    placeDelBtn(btn, (p1.x+p2.x)/2, (p1.y+p2.y)/2 - 20);
+  });
+}
+
+async function removeConn(id) {
+  await sb.from('connectors').delete().eq('id',id);
+  conns = conns.filter(c=>c.id!==id);
+  svgLayer.querySelector(`[data-cid="${id}"]`)?.remove();
+  delBtns.querySelector(`[data-cid="${id}"]`)?.remove();
+}
+
+function redrawConns() {
+  svgLayer.querySelectorAll('g[data-cid]').forEach(g=>g.remove());
+  delBtns.innerHTML = '';
+  conns.forEach(renderConn);
+}
+
+// ════════════════════════════════════════════════
+// CANVAS CONTROLS
+// ════════════════════════════════════════════════
+wrap.addEventListener('wheel', e => {
+  e.preventDefault();
+  const f = e.deltaY<0?1.1:0.9, r = wrap.getBoundingClientRect();
+  const mx = e.clientX-r.left, my = e.clientY-r.top;
+  tx = mx-(mx-tx)*f; ty = my-(my-ty)*f;
+  scale = Math.min(4,Math.max(0.1,scale*f));
+  applyTransform();
+}, { passive:false });
+
+wrap.addEventListener('mousedown', e => {
+  if (e.button===1||(e.button===0&&e.altKey)) {
+    e.preventDefault(); panning=true; panOrigin={x:e.clientX-tx,y:e.clientY-ty}; wrap.classList.add('panning');
+  }
+});
+
+document.addEventListener('mousemove', e => {
+  if (panning) { tx=e.clientX-panOrigin.x; ty=e.clientY-panOrigin.y; applyTransform(); return; }
+  if (dragging) {
+    const dx=(e.clientX-dragging.sx)/scale, dy=(e.clientY-dragging.sy)/scale;
+    const el=cards[dragging.id]?.el; if(el){el.style.left=(dragging.cx+dx)+'px';el.style.top=(dragging.cy+dy)+'px';}
+    redrawConns(); syncDelBtns();
+  }
+});
+
+document.addEventListener('mouseup', async e => {
+  if (panning) { panning=false; wrap.classList.remove('panning'); }
+  if (dragging) {
+    const {id}=dragging, el=cards[id]?.el;
+    const x=parseFloat(el.style.left), y=parseFloat(el.style.top);
+    dragging=null;
+    await sb.from('intersections').update({x,y}).eq('id',id);
+  }
+});
+
+function applyTransform() {
+  world.style.transform=`translate(${tx}px,${ty}px) scale(${scale})`;
+  document.getElementById('status-zoom').textContent=Math.round(scale*100)+'%';
+  syncDelBtns();
+}
+
+function autoArrange() {
+  const ids=Object.keys(cards); const cols=Math.max(1,Math.ceil(Math.sqrt(ids.length)));
+  ids.forEach((id,i)=>{
+    const x=60+(i%cols)*300, y=60+Math.floor(i/cols)*300;
+    cards[id].el.style.left=x+'px'; cards[id].el.style.top=y+'px';
+    cards[id].data.x=x; cards[id].data.y=y;
+    sb.from('intersections').update({x,y}).eq('id',id);
+  });
+  redrawConns(); syncDelBtns(); fitView();
+}
+
+function fitView() {
+  const ids=Object.keys(cards); if(!ids.length) return;
+  let x0=Infinity,y0=Infinity,x1=-Infinity,y1=-Infinity;
+  ids.forEach(id=>{
+    const x=parseFloat(cards[id].el.style.left),y=parseFloat(cards[id].el.style.top);
+    x0=Math.min(x0,x);y0=Math.min(y0,y);x1=Math.max(x1,x+260);y1=Math.max(y1,y+260);
+  });
+  const pad=50,cw=wrap.clientWidth,ch=wrap.clientHeight;
+  scale=Math.min((cw-pad*2)/(x1-x0),(ch-pad*2)/(y1-y0),2);
+  tx=pad-x0*scale; ty=pad-y0*scale; applyTransform();
+}
+
+// ════════════════════════════════════════════════
+// SCENARIO
+// ════════════════════════════════════════════════
+function setScenario(s) {
+  scenario=s;
+  ['am','pm'].forEach(x=>document.getElementById('btn-'+x).classList.toggle('on',x===s));
+  refreshCards();
+}
+
+// ════════════════════════════════════════════════
+// EXPORT CSV
+// ════════════════════════════════════════════════
+function exportCSV() {
+  const ints = Object.values(cards).map(c=>c.data).sort((a,b)=>a.sort_order-b.sort_order);
+  if (!ints.length) { toast('No intersections to export.'); return; }
+
+  const headers = ['Intersection','NS_Street','EW_Street',...VOL_FIELDS];
+  const rows = ints.map(d => {
+    const am = d.am_volumes || {}, pm = d.pm_volumes || {};
+    const volCols = VOL_FIELDS.map(f => `${am[f]??'0'} (${pm[f]??'0'})`);
+    return [d.int_id, d.ns_street, d.ew_street, ...volCols];
+  });
+
+  const csv = [headers, ...rows].map(r => r.map(v => `"${String(v).replace(/"/g,'""')}"`).join(',')).join('\n');
+  const blob = new Blob([csv], { type: 'text/csv' });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href = url; a.download = (project?.name || 'corridor') + '_rebalanced.csv';
+  a.click(); URL.revokeObjectURL(url);
+}
+
+// ════════════════════════════════════════════════
+// UPLOAD + SVG POPULATION
+// ════════════════════════════════════════════════
+function openUpload() { if(!project){toast('Open a project first.');return;} document.getElementById('upload-overlay').style.display='flex'; }
+function closeUpload() { document.getElementById('upload-overlay').style.display='none'; document.getElementById('upload-status').textContent=''; }
+
+async function doUpload() {
+  const svgFile = document.getElementById('svg-file').files[0];
+  const csvFile = document.getElementById('csv-file').files[0];
+  if (!svgFile||!csvFile) { toast('Select both files.'); return; }
+  const status = document.getElementById('upload-status');
+  status.innerHTML = '<span class="spinner"></span> Reading files…';
+  try {
+    const [svgRaw, csvRaw] = await Promise.all([readText(svgFile), readText(csvFile)]);
+    const template = prepareTemplate(svgRaw);
+    const rows = parseCSV(csvRaw);
+    status.innerHTML = '<span class="spinner"></span> Building SVGs…';
+    const records = rows.map((row,i) => buildRecord(template, row, i));
+    status.innerHTML = '<span class="spinner"></span> Saving…';
+    await sb.from('intersections').delete().eq('project_id', project.id);
+    const { error } = await sb.from('intersections').insert(records);
+    if (error) throw new Error(error.message);
+    status.textContent = `✓ Saved ${records.length} intersections.`;
+    setTimeout(() => { closeUpload(); loadCanvas(); }, 800);
+  } catch(err) { status.textContent = '✗ ' + err.message; console.error(err); }
+}
+
+function readText(file) {
+  return new Promise((res,rej)=>{ const r=new FileReader(); r.onload=e=>res(e.target.result); r.onerror=rej; r.readAsText(file); });
+}
+
+function prepareTemplate(raw) {
+  return raw.replace(/<\?xml[^?]*\?>\s*/g,'').trim();
+}
+
+const TMAP = [
+  ['translate(144.48 180.18) rotate(-90)', 'NBT'],
+  ['translate(130.89 170.87) rotate(-90)', 'NBL'],
+  ['translate(158.08 160.99) rotate(-90)', 'NBR'],
+  ['translate(132.16 95.3)',               'WBL'],
+  ['translate(132.16 81.4)',               'WBT'],
+  ['translate(132.16 67.5)',               'WBR'],
+  ['translate(52.64 132.04)',              'EBL'],
+  ['translate(63.03 145.94)',              'EBT'],
+  ['translate(63.03 159.85)',              'EBR'],
+  ['translate(76.78 86.46) rotate(-90)',   'SBT'],
+  ['translate(63.04 86.46) rotate(-90)',   'SBR'],
+  ['translate(90.51 86.46) rotate(-90)',   'SBL'],
+];
+
+function spliceValue(svg, transform, value) {
+  const needle = `transform="${transform}"><tspan x="0" y="0">`;
+  const idx = svg.indexOf(needle); if (idx===-1) return svg;
+  const vs = idx+needle.length, ve = svg.indexOf('</tspan>',vs); if (ve===-1) return svg;
+  return svg.slice(0,vs)+value+svg.slice(ve);
+}
+
+function setIntNumber(svg,v){ const n='cls-16" transform="translate(29.63 40.86)"><tspan x="0" y="0">'; const i=svg.indexOf(n); if(i===-1)return svg; const vs=i+n.length,ve=svg.indexOf('</tspan>',vs); return svg.slice(0,vs)+esc(v)+svg.slice(ve); }
+function setNsStreet(svg,v){ const n='cls-13" transform="translate(199.4 203.51) rotate(-90)"><tspan x="0" y="0">'; const i=svg.indexOf(n); if(i===-1)return svg; const vs=i+n.length,ve=svg.indexOf('</tspan>',vs); return svg.slice(0,vs)+esc(v)+svg.slice(ve); }
+function setEwStreet(svg,v){ const s=svg.indexOf('<text class="cls-12"'); if(s===-1)return svg; const e=svg.indexOf('</text>',s)+'</text>'.length; return svg.slice(0,s)+`<text class="cls-12" transform="translate(17.29 201.98)"><tspan x="0" y="0">${esc(v)}</tspan></text>`+svg.slice(e); }
+
+function parseCSV(text) {
+  const lines = text.trim().split(/\r?\n/);
+  const headers = lines[0].split(',').map(h=>h.trim());
+  return lines.slice(1).filter(l=>l.trim()).map(line => {
+    const vals = line.split(',').map(v=>v.trim());
+    const row={}; headers.forEach((h,i)=>row[h]=vals[i]??''); return row;
+  });
+}
+
+function parseAmPm(raw) {
+  const m=raw.trim().match(/^(\d+)\s*\((\d+)\)/); if(m) return {am:m[1],pm:m[2]};
+  const n=raw.trim().match(/^(\d+)$/); if(n) return {am:n[1],pm:n[1]};
+  return {am:'0',pm:'0'};
+}
+
+function buildRecord(template, row, idx) {
+  const intId=row['Intersection']||String(idx+1), ns=row['NS_Street']||'', ew=row['EW_Street']||'';
+  const amVols={},pmVols={},bothVols={};
+  for (const f of VOL_FIELDS) {
+    const {am,pm}=parseAmPm(row[f]||'0 (0)');
+    amVols[f]=am; pmVols[f]=pm; bothVols[f]=`${am}(${pm})`;
+  }
+  let svg=template;
+  svg=setIntNumber(svg,intId); svg=setNsStreet(svg,ns); svg=setEwStreet(svg,ew);
+  const makeVols = vols => { let s=svg; for(const [t,f] of TMAP) s=spliceValue(s,t,vols[f]??'0'); return s; };
+  return {
+    project_id:project.id, int_id:intId, ns_street:ns, ew_street:ew,
+    am_volumes:amVols, pm_volumes:pmVols,
+    svg_am:makeVols(amVols), svg_pm:makeVols(pmVols), svg_both:makeVols(bothVols),
+    x:60+(idx%4)*300, y:60+Math.floor(idx/4)*300, sort_order:idx,
+  };
+}
+
+// ════════════════════════════════════════════════
+// REALTIME
+// ════════════════════════════════════════════════
+let rtChannel=null;
+function subscribeRealtime() {
+  if(rtChannel) sb.removeChannel(rtChannel);
+  rtChannel=sb.channel('proj-'+project.id)
+    .on('postgres_changes',{event:'*',schema:'public',table:'intersections',filter:`project_id=eq.${project.id}`},handleIntChange)
+    .on('postgres_changes',{event:'*',schema:'public',table:'connectors',filter:`project_id=eq.${project.id}`},handleConnChange)
+    .subscribe();
+}
+function handleIntChange({eventType,new:n,old:o}) {
+  if(eventType==='UPDATE'&&cards[n.id]){
+    cards[n.id].el.style.left=n.x+'px'; cards[n.id].el.style.top=n.y+'px';
+    cards[n.id].data={...cards[n.id].data,...n};
+    cards[n.id].el.querySelector('.svgholder').innerHTML=svgFor(cards[n.id].data);
+    redrawConns(); syncDelBtns();
+  }
+  if(eventType==='INSERT'&&!cards[n.id]){ addCard(n); document.getElementById('empty').style.display='none'; }
+  if(eventType==='DELETE'){ cards[o.id]?.el.remove(); delete cards[o.id]; redrawConns(); }
+}
+function handleConnChange({eventType,new:n,old:o}) {
+  if(eventType==='INSERT'&&!conns.find(c=>c.id===n.id)){ conns.push(n); renderConn(n); }
+  if(eventType==='DELETE'){ conns=conns.filter(c=>c.id!==o.id); svgLayer.querySelector(`[data-cid="${o.id}"]`)?.remove(); delBtns.querySelector(`[data-cid="${o.id}"]`)?.remove(); }
+}
+
+// ════════════════════════════════════════════════
+// UTILS
+// ════════════════════════════════════════════════
+function esc(s){ return String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function setHint(msg){ document.getElementById('status-hint').textContent=msg; }
+let toastT;
+function toast(msg){ const el=document.getElementById('toast'); el.textContent=msg; el.classList.add('show'); clearTimeout(toastT); toastT=setTimeout(()=>el.classList.remove('show'),3000); }
+
+// ════════════════════════════════════════════════
+// BOOT
+// ════════════════════════════════════════════════
+showProjPicker();
+</script>
+</body>
+</html>
