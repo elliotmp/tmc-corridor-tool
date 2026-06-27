@@ -286,21 +286,26 @@ const SVG_STATIC = `
 
 function generateIntersectionSVG(vols, intId, nsStreet, ewStreet) {
   const v = f => esc(String(vols?.[f] ?? '0'));
-  const t = (tx, field) => `<text class="cls-10" transform="${tx}" data-field="${field}"><tspan x="0" y="0">${v(field)}</tspan></text>`;
+  const lbl = (x, y, field, anchor='start') =>
+    `<text class="cls-10" x="${x}" y="${y}" text-anchor="${anchor}" data-field="${field}">${v(field)}</text>`;
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 220.24 220.24">
 ${SVG_DEFS}${SVG_STATIC}
-  ${t('translate(144.48 180.18) rotate(-90)','NBT')}
-  ${t('translate(130.89 170.87) rotate(-90)','NBL')}
-  ${t('translate(158.08 160.99) rotate(-90)','NBR')}
-  ${t('translate(132.16 95.3)','WBL')}
-  ${t('translate(132.16 81.4)','WBT')}
-  ${t('translate(132.16 67.5)','WBR')}
-  ${t('translate(52.64 132.04)','EBL')}
-  ${t('translate(63.03 145.94)','EBT')}
-  ${t('translate(63.03 159.85)','EBR')}
-  ${t('translate(76.78 86.46) rotate(-90)','SBT')}
-  ${t('translate(63.04 86.46) rotate(-90)','SBR')}
-  ${t('translate(90.51 86.46) rotate(-90)','SBL')}
+  <!-- NB labels: below NB arrows (arrows at y≈115-131, labels at y=185-200) -->
+  ${lbl(118, 188, 'NBL', 'middle')}
+  ${lbl(141, 188, 'NBT', 'middle')}
+  ${lbl(162, 188, 'NBR', 'middle')}
+  <!-- WB labels: right of WB arrows (arrows around x=113-128) -->
+  ${lbl(166, 70,  'WBR')}
+  ${lbl(166, 83,  'WBT')}
+  ${lbl(166, 96,  'WBL')}
+  <!-- EB labels: left of EB arrows (arrows around x=88-104) -->
+  ${lbl(82, 133, 'EBL', 'end')}
+  ${lbl(82, 147, 'EBT', 'end')}
+  ${lbl(82, 161, 'EBR', 'end')}
+  <!-- SB labels: above SB arrows (arrows at y≈90-106, labels at y=25-50) -->
+  ${lbl(52,  40, 'SBR', 'middle')}
+  ${lbl(74,  40, 'SBT', 'middle')}
+  ${lbl(91,  40, 'SBL', 'middle')}
   <text class="cls-12" transform="translate(17.29 201.98)"><tspan x="0" y="0">${esc(ewStreet)}</tspan></text>
   <text class="cls-13" transform="translate(199.4 203.51) rotate(-90)"><tspan x="0" y="0">${esc(nsStreet)}</tspan></text>
 </svg>`;
