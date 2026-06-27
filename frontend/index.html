@@ -223,266 +223,121 @@
 // ════════════════════════════════════════════════
 // INTERSECTION SVG GENERATOR
 // ════════════════════════════════════════════════
-const SVG_DEFS = `<defs><style>
-  .cls-1,.cls-2,.cls-8{fill:none}.cls-1,.cls-2{stroke:#231f20;stroke-miterlimit:10}
-  .cls-1{stroke-linecap:round}.cls-2{stroke-width:2px}.cls-3{fill:#e6e7e8;stroke:#231f20;stroke-miterlimit:10;stroke-width:.75px}
-  .cls-4{fill:#231f20;stroke:#231f20;stroke-miterlimit:10;stroke-linecap:round}
-  .cls-5{fill:#0573b5;stroke:#231f20;stroke-miterlimit:10;stroke-width:1.25px}
-  .cls-6{fill:#ffde17;stroke:#231f20;stroke-miterlimit:10;stroke-width:.25px}
-  .cls-7{fill:#ed1c24;stroke:#231f20;stroke-miterlimit:10;stroke-width:.25px}
-  .cls-8{stroke:#231f20;stroke-miterlimit:10;stroke-width:.5px}
-  .cls-9{fill:#00a14b;stroke:#231f20;stroke-miterlimit:10;stroke-width:.25px}
-  .cls-10{font-family:'Segoe UI',sans-serif;font-size:11.52px;fill:#231f20;font-weight:300}
-  .cls-12{font-size:11px;fill:#662d91;font-family:'Segoe UI',sans-serif;font-style:italic}
-  .cls-13{font-size:10px;fill:#662d91;font-family:'Segoe UI',sans-serif;font-style:italic}
-  .cls-16{fill:#fff;font-family:'Segoe UI',sans-serif;font-size:14.4px;font-weight:700}
-</style></defs>`;
-
-const SVG_STATIC = `
-  <polygon class="cls-4" points="144.56 122.39 136.75 122.39 140.65 115.63 144.56 122.39"/>
-  <rect class="cls-4" x="139.43" y="122.43" width="2.45" height="8.69"/>
-  <polygon class="cls-4" points="159 123.44 159 115.63 165.76 119.53 159 123.44"/>
-  <rect class="cls-4" x="153.37" y="125.77" width="2.45" height="5.36"/>
-  <path class="cls-1" d="M161.05,120.68c-.15-.02-.32-.03-.51-.03"/>
-  <path class="cls-4" d="M160.54,118.38v2.27c-.42,0-.96.05-1.55.22-.38.11-1.24.38-1.96,1.07-1.34,1.3-1.19,3.21-1.22,3.56h-2.43c-.03-.52-.17-3.34,1.66-5.25.98-1.02,2.17-1.42,2.7-1.58,1.16-.37,2.17-.35,2.8-.29Z"/>
-  <polygon class="cls-4" points="122.31 123.5 122.3 115.69 115.54 119.6 122.31 123.5"/>
-  <rect class="cls-4" x="125.49" y="125.82" width="2.45" height="5.36"/>
-  <path class="cls-1" d="M120.76,120.72c-.19,0-.36,0-.51.03"/>
-  <path class="cls-4" d="M120.76,118.44v2.27c.42,0,.96.05,1.55.22.38.11,1.24.38,1.96,1.07,1.34,1.3,1.19,3.21,1.22,3.56h2.43c.03-.52.17-3.34-1.66-5.25-.98-1.02-2.17-1.42-2.7-1.58-1.16-.37-2.17-.35-2.8-.29Z"/>
-  <polygon class="cls-4" points="120.12 73.65 120.17 81.46 113.38 77.6 120.12 73.65"/>
-  <rect class="cls-4" x="120.19" y="76.29" width="8.69" height="2.45" transform="translate(-.56 .91) rotate(-.42)"/>
-  <polygon class="cls-4" points="121.06 59.2 113.25 59.26 117.1 52.46 121.06 59.2"/>
-  <rect class="cls-4" x="123.42" y="62.34" width="5.36" height="2.45" transform="translate(-.46 .92) rotate(-.42)"/>
-  <path class="cls-1" d="M118.28,57.17c-.02.15-.02.32-.02.51"/>
-  <path class="cls-4" d="M115.99,57.7l2.27-.02c0,.42.06.96.24,1.54.12.38.39,1.24,1.09,1.95,1.31,1.33,3.22,1.16,3.57,1.19l.02,2.43c-.52.04-3.33.2-5.27-1.62-1.03-.97-1.43-2.16-1.6-2.68-.38-1.16-.37-2.17-.31-2.8Z"/>
-  <polygon class="cls-4" points="121.38 95.89 113.57 95.95 117.53 102.68 121.38 95.89"/>
-  <rect class="cls-4" x="123.68" y="90.23" width="5.36" height="2.45" transform="translate(-.71 .98) rotate(-.44)"/>
-  <path class="cls-1" d="M118.61,97.45c0,.19.01.36.03.51"/>
-  <path class="cls-4" d="M116.34,97.47l2.27-.02c0-.42.04-.96.21-1.55.11-.38.37-1.25,1.06-1.97,1.29-1.35,3.2-1.21,3.55-1.25l-.02-2.43c-.52-.03-3.34-.15-5.24,1.7-1.01.98-1.4,2.18-1.56,2.71-.36,1.16-.34,2.17-.27,2.8Z"/>
-  <polygon class="cls-4" points="97.68 147.42 97.64 139.61 104.43 143.48 97.68 147.42"/>
-  <rect class="cls-4" x="88.93" y="142.32" width="8.69" height="2.45" transform="translate(-.73 .48) rotate(-.29)"/>
-  <polygon class="cls-4" points="96.71 161.87 104.52 161.83 100.65 168.61 96.71 161.87"/>
-  <rect class="cls-4" x="89" y="156.27" width="5.36" height="2.45" transform="translate(-.8 .47) rotate(-.29)"/>
-  <path class="cls-1" d="M99.48,163.9c.02-.15.02-.32.02-.51"/>
-  <path class="cls-4" d="M101.77,163.38h-2.27c0-.41-.06-.95-.23-1.53-.11-.38-.39-1.24-1.08-1.96-1.3-1.33-3.21-1.17-3.57-1.2v-2.43c.51-.04,3.32-.19,5.25,1.63,1.02.97,1.43,2.16,1.59,2.69.38,1.16.37,2.17.31,2.8Z"/>
-  <polygon class="cls-4" points="96.46 125.18 104.27 125.13 100.33 118.39 96.46 125.18"/>
-  <rect class="cls-4" x="88.8" y="128.38" width="5.36" height="2.45" transform="translate(-.72 .51) rotate(-.32)"/>
-  <path class="cls-1" d="M99.23,123.62c0-.19-.01-.36-.03-.51"/>
-  <path class="cls-4" d="M101.51,123.61h-2.27c0,.44-.05.97-.22,1.56-.11.38-.37,1.25-1.06,1.97-1.29,1.35-3.2,1.21-3.55,1.24v2.43c.53.03,3.35.15,5.26-1.69,1.01-.98,1.4-2.18,1.57-2.7.37-1.16.34-2.17.28-2.8Z"/>
-  <polygon class="cls-4" points="70.5 99.5 78.31 99.49 74.41 106.26 70.5 99.5"/>
-  <rect class="cls-4" x="73.18" y="90.76" width="2.45" height="8.69"/>
-  <polygon class="cls-4" points="56.06 98.46 56.06 106.27 49.3 102.37 56.06 98.46"/>
-  <rect class="cls-4" x="59.24" y="90.77" width="2.45" height="5.36"/>
-  <path class="cls-1" d="M54.01,101.21c.15.02.32.03.51.03"/>
-  <path class="cls-4" d="M54.52,103.51v-2.27c.42,0,.96-.05,1.55-.23.38-.11,1.24-.38,1.96-1.07,1.34-1.3,1.19-3.21,1.22-3.56h2.43c.03.52.17,3.33-1.66,5.25-.98,1.02-2.17,1.42-2.69,1.58-1.16.37-2.17.36-2.8.3Z"/>
-  <polygon class="cls-4" points="92.75 98.38 92.76 106.19 99.52 102.28 92.75 98.38"/>
-  <rect class="cls-4" x="87.12" y="90.69" width="2.45" height="5.36"/>
-  <path class="cls-1" d="M94.29,101.16c.19,0,.36,0,.51-.03"/>
-  <path class="cls-4" d="M94.3,103.43v-2.27c-.43,0-.96-.05-1.55-.22-.38-.11-1.24-.38-1.96-1.07-1.34-1.29-1.19-3.21-1.22-3.56h-2.43c-.03.52-.17,3.34,1.66,5.25.98,1.02,2.17,1.41,2.7,1.58,1.16.37,2.17.35,2.8.29Z"/>
-  <rect class="cls-2" x="11.44" y="13.46" width="194.65" height="194.65" rx="4" ry="4"/>
-  <line class="cls-8" x1="206.1" y1="110.79" x2="11.44" y2="110.79"/>
-  <line class="cls-8" x1="108.77" y1="13.46" x2="108.77" y2="208.11"/>
-`;
 
 function generateIntersectionSVG(vols, intId, nsStreet, ewStreet) {
-  const v = f => esc(String(vols?.[f] ?? '0'));
-  const lbl = (x, y, field, anchor='start') =>
-    `<text class="cls-10" x="${x}" y="${y}" text-anchor="${anchor}" data-field="${field}">${v(field)}</text>`;
-  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 220.24 220.24">
-${SVG_DEFS}${SVG_STATIC}
-  <!-- NB labels: below NB arrows (arrows at y≈115-131, labels at y=185-200) -->
-  ${lbl(118, 188, 'NBL', 'middle')}
-  ${lbl(141, 188, 'NBT', 'middle')}
-  ${lbl(162, 188, 'NBR', 'middle')}
-  <!-- WB labels: right of WB arrows (arrows around x=113-128) -->
-  ${lbl(166, 70,  'WBR')}
-  ${lbl(166, 83,  'WBT')}
-  ${lbl(166, 96,  'WBL')}
-  <!-- EB labels: left of EB arrows (arrows around x=88-104) -->
-  ${lbl(82, 133, 'EBL', 'end')}
-  ${lbl(82, 147, 'EBT', 'end')}
-  ${lbl(82, 161, 'EBR', 'end')}
-  <!-- SB labels: above SB arrows (arrows at y≈90-106, labels at y=25-50) -->
-  ${lbl(52,  40, 'SBR', 'middle')}
-  ${lbl(74,  40, 'SBT', 'middle')}
-  ${lbl(91,  40, 'SBL', 'middle')}
-  <text class="cls-12" transform="translate(17.29 201.98)"><tspan x="0" y="0">${esc(ewStreet)}</tspan></text>
-  <text class="cls-13" transform="translate(199.4 203.51) rotate(-90)"><tspan x="0" y="0">${esc(nsStreet)}</tspan></text>
+  const n = f => parseInt(vols?.[f] ?? 0);
+  const s = f => String(n(f));
+  const F = `font-family="'Segoe UI',sans-serif"`;
+
+  // Arrow path helpers
+  function arrow(path, headX, headY, dx, dy) {
+    const len = Math.sqrt(dx*dx+dy*dy), ux=dx/len, uy=dy/len, sz=5;
+    const lx=-uy*sz, ly=ux*sz;
+    return `<path d="${path}" stroke="#231f20" stroke-width="1.8" fill="none" stroke-linecap="round"/>
+    <polygon points="${headX},${headY} ${headX-ux*sz*1.8+lx},${headY-uy*sz*1.8+ly} ${headX-ux*sz*1.8-lx},${headY-uy*sz*1.8-ly}" fill="#231f20"/>`;
+  }
+  // Straight arrow: x1,y1 → x2,y2
+  function straight(x1,y1,x2,y2) {
+    return arrow(`M${x1},${y1} L${x2},${y2}`, x2,y2, x2-x1,y2-y1);
+  }
+  // Turn arrow: approach dir then turn. cx,cy = corner of turn, r = radius
+  function turn(ax,ay, cx,cy, ex,ey) {
+    return arrow(`M${ax},${ay} Q${cx},${cy} ${ex},${ey}`, ex,ey, ex-cx,ey-cy);
+  }
+
+  // Volume label
+  function vol(x, y, field, anchor='middle') {
+    return `<text x="${x}" y="${y}" ${F} font-size="11" font-weight="400" fill="#231f20" text-anchor="${anchor}" data-field="${field}">${esc(s(field))}</text>`;
+  }
+
+  // Street label with word wrap
+  function streetLabel(text, x, y, maxChars, color='#662d91', rotate='') {
+    const words = (text||'').split(' ');
+    const lines = [''];
+    words.forEach(w => {
+      const last = lines[lines.length-1];
+      if (!last) lines[lines.length-1] = w;
+      else if (last.length + 1 + w.length <= maxChars) lines[lines.length-1] += ' ' + w;
+      else lines.push(w);
+    });
+    const inner = lines.map((l,i) =>
+      `<text ${F} font-size="10" fill="${color}" font-style="italic" text-anchor="start" x="0" y="${i*12}">${esc(l)}</text>`
+    ).join('');
+    const tf = rotate ? `translate(${x},${y}) rotate(${rotate})` : `translate(${x},${y})`;
+    return `<g transform="${tf}">${inner}</g>`;
+  }
+
+  // Layout constants
+  const cx=110, cy=110;
+  // Intersection box
+  const bx1=93, by1=93, bx2=127, by2=127;
+  // Road center lines
+  const nbX=104, sbX=116, ebY=116, wbY=104;
+
+  let g = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 220 220">
+  <defs><style>text{font-family:'Segoe UI',sans-serif}</style></defs>
+  <!-- Border -->
+  <rect x="11" y="13" width="198" height="194" rx="4" fill="white" stroke="#231f20" stroke-width="1.5"/>
+  <!-- Quadrant lines -->
+  <line x1="11" y1="${cy}" x2="209" y2="${cy}" stroke="#231f20" stroke-width="0.5"/>
+  <line x1="${cx}" y1="13" x2="${cx}" y2="207" stroke="#231f20" stroke-width="0.5"/>
+  <!-- Road lane dividers (dashed) -->
+  <line x1="${cx}" y1="13" x2="${cx}" y2="${by1}" stroke="#aaa" stroke-width="0.5" stroke-dasharray="3,3"/>
+  <line x1="${cx}" y1="${by2}" x2="${cx}" y2="207" stroke="#aaa" stroke-width="0.5" stroke-dasharray="3,3"/>
+  <line x1="11" y1="${cy}" x2="${bx1}" y2="${cy}" stroke="#aaa" stroke-width="0.5" stroke-dasharray="3,3"/>
+  <line x1="${bx2}" y1="${cy}" x2="209" y2="${cy}" stroke="#aaa" stroke-width="0.5" stroke-dasharray="3,3"/>
+
+  <!-- ── NB approach (bottom-right quad, vehicles going north) ── -->
+  <!-- NBT straight up -->
+  ${straight(nbX, by2+30, nbX, by2+4)}
+  ${vol(nbX-10, by2+30, 'NBT', 'end')}
+  <!-- NBL left turn (exits west) -->
+  ${turn(nbX+12, by2+30, nbX+12, wbY, bx1-4, wbY)}
+  ${vol(nbX+12+14, by2+30, 'NBL', 'start')}
+  <!-- NBR right turn (exits east) -->
+  ${turn(nbX-12, by2+30, nbX-12, ebY, bx2+4, ebY)}
+  ${vol(nbX-12-14, by2+30, 'NBR', 'end')}
+
+  <!-- ── SB approach (top-left quad, vehicles going south) ── -->
+  <!-- SBT straight down -->
+  ${straight(sbX, by1-30, sbX, by1-4)}
+  ${vol(sbX+10, by1-30, 'SBT', 'start')}
+  <!-- SBL left turn (exits east) -->
+  ${turn(sbX-12, by1-30, sbX-12, ebY, bx2+4, ebY)}
+  ${vol(sbX-12-14, by1-30, 'SBL', 'end')}
+  <!-- SBR right turn (exits west) -->
+  ${turn(sbX+12, by1-30, sbX+12, wbY, bx1-4, wbY)}
+  ${vol(sbX+12+14, by1-30, 'SBR', 'start')}
+
+  <!-- ── EB approach (bottom-left quad, vehicles going east) ── -->
+  <!-- EBT straight right -->
+  ${straight(bx1-30, ebY, bx1-4, ebY)}
+  ${vol(bx1-30, ebY-6, 'EBT', 'middle')}
+  <!-- EBL left turn (exits north) -->
+  ${turn(bx1-30, ebY-12, nbX, ebY-12, nbX, by1-4)}
+  ${vol(bx1-30, ebY-12-6, 'EBL', 'middle')}
+  <!-- EBR right turn (exits south) -->
+  ${turn(bx1-30, ebY+12, sbX, ebY+12, sbX, by2+4)}
+  ${vol(bx1-30, ebY+12+12, 'EBR', 'middle')}
+
+  <!-- ── WB approach (top-right quad, vehicles going west) ── -->
+  <!-- WBT straight left -->
+  ${straight(bx2+30, wbY, bx2+4, wbY)}
+  ${vol(bx2+30, wbY-6, 'WBT', 'middle')}
+  <!-- WBL left turn (exits south) -->
+  ${turn(bx2+30, wbY+12, sbX, wbY+12, sbX, by2+4)}
+  ${vol(bx2+30, wbY+12+12, 'WBL', 'middle')}
+  <!-- WBR right turn (exits north) -->
+  ${turn(bx2+30, wbY-12, nbX, wbY-12, nbX, by1-4)}
+  ${vol(bx2+30, wbY-12-6, 'WBR', 'middle')}
+
+  <!-- Street labels -->
+  ${streetLabel(ewStreet, 14, 207, 22)}
+  ${streetLabel(nsStreet, 207, 70, 12, '#662d91', '-90')}
 </svg>`;
+  return g;
 }
 
-// placeholder so old references don't break during transition
-const DEFAULT_SVG_TEMPLATE = `<?xml version="1.0" encoding="UTF-8"?>
-<svg id="Layer_1" data-name="Layer 1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 220.24 220.24">
-  <defs>
-    <style>
-      .cls-1, .cls-2, .cls-3, .cls-4, .cls-5, .cls-6, .cls-7, .cls-8, .cls-9 {
-        stroke: #231f20;
-        stroke-miterlimit: 10;
-      }
-
-      .cls-1, .cls-2, .cls-8 {
-        fill: none;
-      }
-
-      .cls-1, .cls-4 {
-        stroke-linecap: round;
-      }
-
-      .cls-2 {
-        stroke-width: 2px;
-      }
-
-      .cls-3 {
-        fill: #e6e7e8;
-        stroke-width: .75px;
-      }
-
-      .cls-4, .cls-10 {
-        fill: #231f20;
-      }
-
-      .cls-11 {
-        letter-spacing: 0em;
-      }
-
-      .cls-5 {
-        fill: #0573b5;
-        stroke-width: 1.25px;
-      }
-
-      .cls-6 {
-        fill: #ffde17;
-      }
-
-      .cls-6, .cls-7, .cls-9 {
-        stroke-width: .25px;
-      }
-
-      .cls-12 {
-        font-size: 11px;
-      }
-
-      .cls-12, .cls-13 {
-        fill: #662d91;
-        font-family: SegoeUI-Italic, 'Segoe UI';
-        font-style: italic;
-      }
-
-      .cls-14 {
-        letter-spacing: .02em;
-      }
-
-      .cls-7 {
-        fill: #ed1c24;
-      }
-
-      .cls-15 {
-        letter-spacing: .03em;
-      }
-
-      .cls-16 {
-        fill: #fff;
-        font-family: SegoeUI-Bold, 'Segoe UI';
-        font-size: 14.4px;
-        font-weight: 700;
-      }
-
-      .cls-17 {
-        letter-spacing: 0em;
-      }
-
-      .cls-8 {
-        stroke-width: .5px;
-      }
-
-      .cls-10 {
-        font-family: SegoeUI-Semilight, 'Segoe UI';
-        font-size: 11.52px;
-        font-weight: 300;
-      }
-
-      .cls-13 {
-        font-size: 10px;
-      }
-
-      .cls-9 {
-        fill: #00a14b;
-      }
-    </style>
-  </defs>
-  <polygon class="cls-4" points="144.56 122.39 136.75 122.39 140.65 115.63 144.56 122.39"/>
-  <rect class="cls-4" x="139.43" y="122.43" width="2.45" height="8.69"/>
-  <polygon class="cls-4" points="159 123.44 159 115.63 165.76 119.53 159 123.44"/>
-  <rect class="cls-4" x="153.37" y="125.77" width="2.45" height="5.36"/>
-  <path class="cls-1" d="M161.05,120.68c-.15-.02-.32-.03-.51-.03"/>
-  <path class="cls-4" d="M160.54,118.38v2.27c-.42,0-.96.05-1.55.22-.38.11-1.24.38-1.96,1.07-1.34,1.3-1.19,3.21-1.22,3.56h-2.43c-.03-.52-.17-3.34,1.66-5.25.98-1.02,2.17-1.42,2.7-1.58,1.16-.37,2.17-.35,2.8-.29Z"/>
-  <line class="cls-1" x1="160.54" y1="120.66" x2="160.54" y2="120.65"/>
-  <polygon class="cls-4" points="122.31 123.5 122.3 115.69 115.54 119.6 122.31 123.5"/>
-  <rect class="cls-4" x="125.49" y="125.82" width="2.45" height="5.36"/>
-  <path class="cls-1" d="M120.76,120.72c-.19,0-.36,0-.51.03"/>
-  <path class="cls-4" d="M120.76,118.44v2.27c.42,0,.96.05,1.55.22.38.11,1.24.38,1.96,1.07,1.34,1.3,1.19,3.21,1.22,3.56h2.43c.03-.52.17-3.34-1.66-5.25-.98-1.02-2.17-1.42-2.7-1.58-1.16-.37-2.17-.35-2.8-.29Z"/>
-  <line class="cls-1" x1="120.76" y1="120.72" x2="120.76" y2="120.72"/>
-  <text class="cls-10" transform="translate(144.48 180.18) rotate(-90)"><tspan x="0" y="0">775 (852)</tspan></text>
-  <text class="cls-10" transform="translate(130.89 170.87) rotate(-90)"><tspan x="0" y="0">162 (71)</tspan></text>
-  <text class="cls-10" transform="translate(158.08 160.99) rotate(-90)"><tspan x="0" y="0">9 (14)</tspan></text>
-  <polygon class="cls-4" points="120.12 73.65 120.17 81.46 113.38 77.6 120.12 73.65"/>
-  <rect class="cls-4" x="120.19" y="76.29" width="8.69" height="2.45" transform="translate(-.56 .91) rotate(-.42)"/>
-  <polygon class="cls-4" points="121.06 59.2 113.25 59.26 117.1 52.46 121.06 59.2"/>
-  <rect class="cls-4" x="123.42" y="62.34" width="5.36" height="2.45" transform="translate(-.46 .92) rotate(-.42)"/>
-  <path class="cls-1" d="M118.28,57.17c-.02.15-.02.32-.02.51"/>
-  <path class="cls-4" d="M115.99,57.7l2.27-.02c0,.42.06.96.24,1.54.12.38.39,1.24,1.09,1.95,1.31,1.33,3.22,1.16,3.57,1.19l.02,2.43c-.52.04-3.33.2-5.27-1.62-1.03-.97-1.43-2.16-1.6-2.68-.38-1.16-.37-2.17-.31-2.8Z"/>
-  <line class="cls-1" x1="118.27" y1="57.68" x2="118.26" y2="57.68"/>
-  <polygon class="cls-4" points="121.38 95.89 113.57 95.95 117.53 102.68 121.38 95.89"/>
-  <rect class="cls-4" x="123.68" y="90.23" width="5.36" height="2.45" transform="translate(-.71 .98) rotate(-.44)"/>
-  <path class="cls-1" d="M118.61,97.45c0,.19.01.36.03.51"/>
-  <path class="cls-4" d="M116.34,97.47l2.27-.02c0-.42.04-.96.21-1.55.11-.38.37-1.25,1.06-1.97,1.29-1.35,3.2-1.21,3.55-1.25l-.02-2.43c-.52-.03-3.34-.15-5.24,1.7-1.01.98-1.4,2.18-1.56,2.71-.36,1.16-.34,2.17-.27,2.8Z"/>
-  <line class="cls-1" x1="118.61" y1="97.45" x2="118.62" y2="97.45"/>
-  <text class="cls-10" transform="translate(132.16 95.3)"><tspan x="0" y="0">6 (11)</tspan></text>
-  <text class="cls-10" transform="translate(132.16 81.4)"><tspan x="0" y="0">0 (1)</tspan></text>
-  <text class="cls-10" transform="translate(132.16 67.5)"><tspan x="0" y="0">7 (6)</tspan></text>
-  <polygon class="cls-4" points="97.68 147.42 97.64 139.61 104.43 143.48 97.68 147.42"/>
-  <rect class="cls-4" x="88.93" y="142.32" width="8.69" height="2.45" transform="translate(-.73 .48) rotate(-.29)"/>
-  <polygon class="cls-4" points="96.71 161.87 104.52 161.83 100.65 168.61 96.71 161.87"/>
-  <rect class="cls-4" x="89" y="156.27" width="5.36" height="2.45" transform="translate(-.8 .47) rotate(-.29)"/>
-  <path class="cls-1" d="M99.48,163.9c.02-.15.02-.32.02-.51"/>
-  <path class="cls-4" d="M101.77,163.38h-2.27c0-.41-.06-.95-.23-1.53-.11-.38-.39-1.24-1.08-1.96-1.3-1.33-3.21-1.17-3.57-1.2v-2.43c.51-.04,3.32-.19,5.25,1.63,1.02.97,1.43,2.16,1.59,2.69.38,1.16.37,2.17.31,2.8Z"/>
-  <line class="cls-1" x1="99.49" y1="163.39" x2="99.5" y2="163.39"/>
-  <polygon class="cls-4" points="96.46 125.18 104.27 125.13 100.33 118.39 96.46 125.18"/>
-  <rect class="cls-4" x="88.8" y="128.38" width="5.36" height="2.45" transform="translate(-.72 .51) rotate(-.32)"/>
-  <path class="cls-1" d="M99.23,123.62c0-.19-.01-.36-.03-.51"/>
-  <path class="cls-4" d="M101.51,123.61h-2.27c0,.44-.05.97-.22,1.56-.11.38-.37,1.25-1.06,1.97-1.29,1.35-3.2,1.21-3.55,1.24v2.43c.53.03,3.35.15,5.26-1.69,1.01-.98,1.4-2.18,1.57-2.7.37-1.16.34-2.17.28-2.8Z"/>
-  <line class="cls-1" x1="99.23" y1="123.62" x2="99.23" y2="123.62"/>
-  <text class="cls-10" transform="translate(52.64 132.04)"><tspan x="0" y="0">15 (23)</tspan></text>
-  <text class="cls-10" transform="translate(63.03 145.94)"><tspan x="0" y="0">0 (0)</tspan></text>
-  <text class="cls-10" transform="translate(63.03 159.85)"><tspan x="0" y="0">0 (3)</tspan></text>
-  <polygon class="cls-4" points="70.5 99.5 78.31 99.49 74.41 106.26 70.5 99.5"/>
-  <rect class="cls-4" x="73.18" y="90.76" width="2.45" height="8.69"/>
-  <polygon class="cls-4" points="56.06 98.46 56.06 106.27 49.3 102.37 56.06 98.46"/>
-  <rect class="cls-4" x="59.24" y="90.77" width="2.45" height="5.36"/>
-  <path class="cls-1" d="M54.01,101.21c.15.02.32.03.51.03"/>
-  <path class="cls-4" d="M54.52,103.51v-2.27c.42,0,.96-.05,1.55-.23.38-.11,1.24-.38,1.96-1.07,1.34-1.3,1.19-3.21,1.22-3.56h2.43c.03.52.17,3.33-1.66,5.25-.98,1.02-2.17,1.42-2.69,1.58-1.16.37-2.17.36-2.8.3Z"/>
-  <line class="cls-1" x1="54.52" y1="101.23" x2="54.52" y2="101.24"/>
-  <polygon class="cls-4" points="92.75 98.38 92.76 106.19 99.52 102.28 92.75 98.38"/>
-  <rect class="cls-4" x="87.12" y="90.69" width="2.45" height="5.36"/>
-  <path class="cls-1" d="M94.29,101.16c.19,0,.36,0,.51-.03"/>
-  <path class="cls-4" d="M94.3,103.43v-2.27c-.43,0-.96-.05-1.55-.22-.38-.11-1.24-.38-1.96-1.07-1.34-1.29-1.19-3.21-1.22-3.56h-2.43c-.03.52-.17,3.34,1.66,5.25.98,1.02,2.17,1.41,2.7,1.58,1.16.37,2.17.35,2.8.29Z"/>
-  <line class="cls-1" x1="94.29" y1="101.16" x2="94.29" y2="101.15"/>
-  <text class="cls-10" transform="translate(76.78 86.46) rotate(-90)"><tspan x="0" y="0">733 (652)</tspan></text>
-  <text class="cls-10" transform="translate(63.04 86.46) rotate(-90)"><tspan x="0" y="0">113 (76)</tspan></text>
-  <text class="cls-10" transform="translate(90.51 86.46) rotate(-90)"><tspan x="0" y="0">5 (1)</tspan></text>
-  <text class="cls-12" transform="translate(17.29 201.98)"><tspan x="0" y="0">A</tspan><tspan class="cls-15" x="6.95" y="0">L</tspan><tspan class="cls-11" x="12.37" y="0">A Elemen</tspan><tspan class="cls-17" x="57.01" y="0">t</tspan><tspan class="cls-11" x="60.51" y="0">a</tspan><tspan class="cls-14" x="66.47" y="0">r</tspan><tspan x="70.6" y="0">y / </tspan></text>
-  <text class="cls-13" transform="translate(199.4 203.51) rotate(-90)"><tspan x="0" y="0">Hunt Hwy</tspan></text>
-  <circle class="cls-5" cx="33.77" cy="35.53" r="17.28"/>
-  <text class="cls-16" transform="translate(29.63 40.86)"><tspan x="0" y="0">4</tspan></text>
-  <rect class="cls-2" x="11.44" y="13.46" width="194.65" height="194.65" rx="4" ry="4"/>
-  <line class="cls-8" x1="206.1" y1="110.79" x2="11.44" y2="110.79"/>
-  <line class="cls-8" x1="108.77" y1="13.46" x2="108.77" y2="208.11"/>
-  <rect class="cls-3" x="104.7" y="102.56" width="8.14" height="16.45" rx="2.83" ry="2.83"/>
-  <ellipse class="cls-7" cx="108.77" cy="106.23" rx="1.89" ry="1.88"/>
-  <ellipse class="cls-6" cx="108.77" cy="110.79" rx="1.89" ry="1.88"/>
-  <ellipse class="cls-9" cx="108.77" cy="115.34" rx="1.89" ry="1.88"/>
-</svg>`;
 
 // ════════════════════════════════════════════════
 // CONFIG
