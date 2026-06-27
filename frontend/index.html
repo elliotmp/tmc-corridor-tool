@@ -85,8 +85,19 @@
   .card-inner { width: 100%; height: 100%; border-radius: 8px; overflow: hidden; background: #fff; box-shadow: 0 3px 16px rgba(0,0,0,.5); }
   .card-inner svg { width: 100%; height: 100%; display: block; }
   .card-label { position: absolute; bottom: -22px; left: 0; right: 0; text-align: center; font-size: 10px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; pointer-events: none; }
-  .card-edit-btn { position: absolute; top: -10px; right: -10px; width: 24px; height: 24px; border-radius: 50%; background: #1e5aaa; border: 2px solid var(--bg); color: white; font-size: 13px; display: flex; align-items: center; justify-content: center; cursor: pointer; opacity: 0; transition: opacity .15s; pointer-events: all; z-index: 20; }
+  .card-edit-btn { position: absolute; top: -14px; right: -14px; width: 36px; height: 36px; border-radius: 50%; background: #1e5aaa; border: 2px solid var(--bg); color: white; font-size: 20px; display: flex; align-items: center; justify-content: center; cursor: pointer; opacity: 0; transition: opacity .15s; pointer-events: all; z-index: 20; }
   .card:hover .card-edit-btn { opacity: 1; }
+
+  /* Inline SVG volume editing */
+  #svg-inline-input {
+    position: fixed; z-index: 9999; display: none;
+    width: 60px; padding: 2px 4px; font-size: 12px; font-weight: 600;
+    border: 2px solid #3b82f6; border-radius: 4px;
+    background: #fff; color: #111; text-align: center;
+    box-shadow: 0 2px 8px rgba(0,0,0,.4);
+  }
+  .svgholder text.cls-10 { cursor: pointer; }
+  .svgholder text.cls-10:hover tspan { fill: #3b82f6; }
 
   /* Ports */
   .port { position: absolute; width: 13px; height: 13px; border-radius: 50%; background: #3b82f6; border: 2px solid white; transform: translate(-50%,-50%); opacity: 0; transition: opacity .12s; cursor: crosshair; pointer-events: all; z-index: 10; }
@@ -136,7 +147,6 @@
 <div class="overlay" id="upload-overlay" style="display:none">
   <div class="box">
     <h2>Upload Data</h2>
-    <div class="field"><label>SVG Template <span style="color:var(--muted);font-weight:400">(optional — uses default if blank)</span></label><input type="file" id="svg-file" accept=".svg" /></div>
     <div class="field"><label>Volume CSV</label><input type="file" id="csv-file" accept=".csv" /></div>
     <div id="upload-status"></div>
     <div class="row" style="justify-content:flex-end">
@@ -183,6 +193,9 @@
   <button class="btn-accent" onclick="exportCSV()">Export CSV</button>
 </div>
 
+<!-- Inline SVG volume input -->
+<input id="svg-inline-input" type="number" min="0" />
+
 <!-- Canvas -->
 <div id="canvas-wrap">
   <div id="world">
@@ -208,8 +221,98 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <script>
 // ════════════════════════════════════════════════
-// DEFAULT SVG TEMPLATE (embedded)
+// INTERSECTION SVG GENERATOR
 // ════════════════════════════════════════════════
+const SVG_DEFS = `<defs><style>
+  .cls-1,.cls-2,.cls-8{fill:none}.cls-1,.cls-2{stroke:#231f20;stroke-miterlimit:10}
+  .cls-1{stroke-linecap:round}.cls-2{stroke-width:2px}.cls-3{fill:#e6e7e8;stroke:#231f20;stroke-miterlimit:10;stroke-width:.75px}
+  .cls-4{fill:#231f20;stroke:#231f20;stroke-miterlimit:10;stroke-linecap:round}
+  .cls-5{fill:#0573b5;stroke:#231f20;stroke-miterlimit:10;stroke-width:1.25px}
+  .cls-6{fill:#ffde17;stroke:#231f20;stroke-miterlimit:10;stroke-width:.25px}
+  .cls-7{fill:#ed1c24;stroke:#231f20;stroke-miterlimit:10;stroke-width:.25px}
+  .cls-8{stroke:#231f20;stroke-miterlimit:10;stroke-width:.5px}
+  .cls-9{fill:#00a14b;stroke:#231f20;stroke-miterlimit:10;stroke-width:.25px}
+  .cls-10{font-family:'Segoe UI',sans-serif;font-size:11.52px;fill:#231f20;font-weight:300}
+  .cls-12{font-size:11px;fill:#662d91;font-family:'Segoe UI',sans-serif;font-style:italic}
+  .cls-13{font-size:10px;fill:#662d91;font-family:'Segoe UI',sans-serif;font-style:italic}
+  .cls-16{fill:#fff;font-family:'Segoe UI',sans-serif;font-size:14.4px;font-weight:700}
+</style></defs>`;
+
+const SVG_STATIC = `
+  <polygon class="cls-4" points="144.56 122.39 136.75 122.39 140.65 115.63 144.56 122.39"/>
+  <rect class="cls-4" x="139.43" y="122.43" width="2.45" height="8.69"/>
+  <polygon class="cls-4" points="159 123.44 159 115.63 165.76 119.53 159 123.44"/>
+  <rect class="cls-4" x="153.37" y="125.77" width="2.45" height="5.36"/>
+  <path class="cls-1" d="M161.05,120.68c-.15-.02-.32-.03-.51-.03"/>
+  <path class="cls-4" d="M160.54,118.38v2.27c-.42,0-.96.05-1.55.22-.38.11-1.24.38-1.96,1.07-1.34,1.3-1.19,3.21-1.22,3.56h-2.43c-.03-.52-.17-3.34,1.66-5.25.98-1.02,2.17-1.42,2.7-1.58,1.16-.37,2.17-.35,2.8-.29Z"/>
+  <polygon class="cls-4" points="122.31 123.5 122.3 115.69 115.54 119.6 122.31 123.5"/>
+  <rect class="cls-4" x="125.49" y="125.82" width="2.45" height="5.36"/>
+  <path class="cls-1" d="M120.76,120.72c-.19,0-.36,0-.51.03"/>
+  <path class="cls-4" d="M120.76,118.44v2.27c.42,0,.96.05,1.55.22.38.11,1.24.38,1.96,1.07,1.34,1.3,1.19,3.21,1.22,3.56h2.43c.03-.52.17-3.34-1.66-5.25-.98-1.02-2.17-1.42-2.7-1.58-1.16-.37-2.17-.35-2.8-.29Z"/>
+  <polygon class="cls-4" points="120.12 73.65 120.17 81.46 113.38 77.6 120.12 73.65"/>
+  <rect class="cls-4" x="120.19" y="76.29" width="8.69" height="2.45" transform="translate(-.56 .91) rotate(-.42)"/>
+  <polygon class="cls-4" points="121.06 59.2 113.25 59.26 117.1 52.46 121.06 59.2"/>
+  <rect class="cls-4" x="123.42" y="62.34" width="5.36" height="2.45" transform="translate(-.46 .92) rotate(-.42)"/>
+  <path class="cls-1" d="M118.28,57.17c-.02.15-.02.32-.02.51"/>
+  <path class="cls-4" d="M115.99,57.7l2.27-.02c0,.42.06.96.24,1.54.12.38.39,1.24,1.09,1.95,1.31,1.33,3.22,1.16,3.57,1.19l.02,2.43c-.52.04-3.33.2-5.27-1.62-1.03-.97-1.43-2.16-1.6-2.68-.38-1.16-.37-2.17-.31-2.8Z"/>
+  <polygon class="cls-4" points="121.38 95.89 113.57 95.95 117.53 102.68 121.38 95.89"/>
+  <rect class="cls-4" x="123.68" y="90.23" width="5.36" height="2.45" transform="translate(-.71 .98) rotate(-.44)"/>
+  <path class="cls-1" d="M118.61,97.45c0,.19.01.36.03.51"/>
+  <path class="cls-4" d="M116.34,97.47l2.27-.02c0-.42.04-.96.21-1.55.11-.38.37-1.25,1.06-1.97,1.29-1.35,3.2-1.21,3.55-1.25l-.02-2.43c-.52-.03-3.34-.15-5.24,1.7-1.01.98-1.4,2.18-1.56,2.71-.36,1.16-.34,2.17-.27,2.8Z"/>
+  <polygon class="cls-4" points="97.68 147.42 97.64 139.61 104.43 143.48 97.68 147.42"/>
+  <rect class="cls-4" x="88.93" y="142.32" width="8.69" height="2.45" transform="translate(-.73 .48) rotate(-.29)"/>
+  <polygon class="cls-4" points="96.71 161.87 104.52 161.83 100.65 168.61 96.71 161.87"/>
+  <rect class="cls-4" x="89" y="156.27" width="5.36" height="2.45" transform="translate(-.8 .47) rotate(-.29)"/>
+  <path class="cls-1" d="M99.48,163.9c.02-.15.02-.32.02-.51"/>
+  <path class="cls-4" d="M101.77,163.38h-2.27c0-.41-.06-.95-.23-1.53-.11-.38-.39-1.24-1.08-1.96-1.3-1.33-3.21-1.17-3.57-1.2v-2.43c.51-.04,3.32-.19,5.25,1.63,1.02.97,1.43,2.16,1.59,2.69.38,1.16.37,2.17.31,2.8Z"/>
+  <polygon class="cls-4" points="96.46 125.18 104.27 125.13 100.33 118.39 96.46 125.18"/>
+  <rect class="cls-4" x="88.8" y="128.38" width="5.36" height="2.45" transform="translate(-.72 .51) rotate(-.32)"/>
+  <path class="cls-1" d="M99.23,123.62c0-.19-.01-.36-.03-.51"/>
+  <path class="cls-4" d="M101.51,123.61h-2.27c0,.44-.05.97-.22,1.56-.11.38-.37,1.25-1.06,1.97-1.29,1.35-3.2,1.21-3.55,1.24v2.43c.53.03,3.35.15,5.26-1.69,1.01-.98,1.4-2.18,1.57-2.7.37-1.16.34-2.17.28-2.8Z"/>
+  <polygon class="cls-4" points="70.5 99.5 78.31 99.49 74.41 106.26 70.5 99.5"/>
+  <rect class="cls-4" x="73.18" y="90.76" width="2.45" height="8.69"/>
+  <polygon class="cls-4" points="56.06 98.46 56.06 106.27 49.3 102.37 56.06 98.46"/>
+  <rect class="cls-4" x="59.24" y="90.77" width="2.45" height="5.36"/>
+  <path class="cls-1" d="M54.01,101.21c.15.02.32.03.51.03"/>
+  <path class="cls-4" d="M54.52,103.51v-2.27c.42,0,.96-.05,1.55-.23.38-.11,1.24-.38,1.96-1.07,1.34-1.3,1.19-3.21,1.22-3.56h2.43c.03.52.17,3.33-1.66,5.25-.98,1.02-2.17,1.42-2.69,1.58-1.16.37-2.17.36-2.8.3Z"/>
+  <polygon class="cls-4" points="92.75 98.38 92.76 106.19 99.52 102.28 92.75 98.38"/>
+  <rect class="cls-4" x="87.12" y="90.69" width="2.45" height="5.36"/>
+  <path class="cls-1" d="M94.29,101.16c.19,0,.36,0,.51-.03"/>
+  <path class="cls-4" d="M94.3,103.43v-2.27c-.43,0-.96-.05-1.55-.22-.38-.11-1.24-.38-1.96-1.07-1.34-1.29-1.19-3.21-1.22-3.56h-2.43c-.03.52-.17,3.34,1.66,5.25.98,1.02,2.17,1.41,2.7,1.58,1.16.37,2.17.35,2.8.29Z"/>
+  <rect class="cls-2" x="11.44" y="13.46" width="194.65" height="194.65" rx="4" ry="4"/>
+  <line class="cls-8" x1="206.1" y1="110.79" x2="11.44" y2="110.79"/>
+  <line class="cls-8" x1="108.77" y1="13.46" x2="108.77" y2="208.11"/>
+  <rect class="cls-3" x="104.7" y="102.56" width="8.14" height="16.45" rx="2.83" ry="2.83"/>
+  <ellipse class="cls-7" cx="108.77" cy="106.23" rx="1.89" ry="1.88"/>
+  <ellipse class="cls-6" cx="108.77" cy="110.79" rx="1.89" ry="1.88"/>
+  <ellipse class="cls-9" cx="108.77" cy="115.34" rx="1.89" ry="1.88"/>
+`;
+
+function generateIntersectionSVG(vols, intId, nsStreet, ewStreet) {
+  const v = f => esc(String(vols?.[f] ?? '0'));
+  const t = (tx, field) => `<text class="cls-10" transform="${tx}" data-field="${field}"><tspan x="0" y="0">${v(field)}</tspan></text>`;
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 220.24 220.24">
+${SVG_DEFS}${SVG_STATIC}
+  ${t('translate(144.48 180.18) rotate(-90)','NBT')}
+  ${t('translate(130.89 170.87) rotate(-90)','NBL')}
+  ${t('translate(158.08 160.99) rotate(-90)','NBR')}
+  ${t('translate(132.16 95.3)','WBL')}
+  ${t('translate(132.16 81.4)','WBT')}
+  ${t('translate(132.16 67.5)','WBR')}
+  ${t('translate(52.64 132.04)','EBL')}
+  ${t('translate(63.03 145.94)','EBT')}
+  ${t('translate(63.03 159.85)','EBR')}
+  ${t('translate(76.78 86.46) rotate(-90)','SBT')}
+  ${t('translate(63.04 86.46) rotate(-90)','SBR')}
+  ${t('translate(90.51 86.46) rotate(-90)','SBL')}
+  <text class="cls-12" transform="translate(17.29 201.98)"><tspan x="0" y="0">${esc(ewStreet)}</tspan></text>
+  <text class="cls-13" transform="translate(199.4 203.51) rotate(-90)"><tspan x="0" y="0">${esc(nsStreet)}</tspan></text>
+  <circle class="cls-5" cx="33.77" cy="35.53" r="17.28"/>
+  <text class="cls-16" transform="translate(29.63 40.86)" text-anchor="middle"><tspan x="0" y="0">${esc(String(intId))}</tspan></text>
+</svg>`;
+}
+
+// placeholder so old references don't break during transition
 const DEFAULT_SVG_TEMPLATE = `<?xml version="1.0" encoding="UTF-8"?>
 <svg id="Layer_1" data-name="Layer 1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 220.24 220.24">
   <defs>
@@ -508,18 +611,75 @@ function addCard(data) {
   });
   world.appendChild(el);
   cards[data.id] = { el, data };
+  attachSvgClickHandlers(data.id);
 }
 
 function svgFor(d) {
-  return (scenario === 'pm' ? d.svg_pm : d.svg_am) || '';
+  const vols = scenario === 'pm' ? d.pm_volumes : d.am_volumes;
+  return generateIntersectionSVG(vols, d.int_id, d.ns_street, d.ew_street);
 }
 
 function refreshCards() {
   Object.values(cards).forEach(({ el, data }) => {
     el.querySelector('.svgholder').innerHTML = svgFor(data);
+    attachSvgClickHandlers(data.id);
   });
   redrawConns();
 }
+
+// ════════════════════════════════════════════════
+// INLINE SVG CLICK-TO-EDIT
+// ════════════════════════════════════════════════
+const inlineInput = document.getElementById('svg-inline-input');
+let inlineState = null; // { cardId, field, period }
+
+function attachSvgClickHandlers(cardId) {
+  const { el, data } = cards[cardId];
+  const svgEl = el.querySelector('.svgholder svg');
+  if (!svgEl) return;
+  svgEl.querySelectorAll('text.cls-10[data-field]').forEach(textEl => {
+    const field = textEl.dataset.field;
+    textEl.style.cursor = 'pointer';
+    textEl.onclick = e => {
+      e.stopPropagation();
+      const period = scenario === 'pm' ? 'pm' : 'am';
+      const vols = period === 'am' ? cards[cardId].data.am_volumes : cards[cardId].data.pm_volumes;
+      const currentVal = vols?.[field] ?? '0';
+      const rect = textEl.getBoundingClientRect();
+      inlineInput.value = currentVal;
+      inlineInput.style.display = 'block';
+      inlineInput.style.left = rect.left + 'px';
+      inlineInput.style.top  = (rect.top - 4) + 'px';
+      inlineState = { cardId, field, period };
+      inlineInput.focus();
+      inlineInput.select();
+    };
+  });
+}
+
+async function commitInlineEdit() {
+  if (!inlineState) return;
+  inlineInput.style.display = 'none';
+  const { cardId, field, period } = inlineState;
+  inlineState = null;
+  const val = String(Math.max(0, parseInt(inlineInput.value) || 0));
+  const { data } = cards[cardId];
+  const newAm = { ...data.am_volumes };
+  const newPm = { ...data.pm_volumes };
+  if (period === 'am') newAm[field] = val; else newPm[field] = val;
+  const updates = { am_volumes: newAm, pm_volumes: newPm };
+  Object.assign(data, updates);
+  cards[cardId].el.querySelector('.svgholder').innerHTML = svgFor(data);
+  attachSvgClickHandlers(cardId);
+  redrawConns();
+  await sb.from('intersections').update(updates).eq('id', cardId);
+}
+
+inlineInput.addEventListener('blur', commitInlineEdit);
+inlineInput.addEventListener('keydown', e => {
+  if (e.key === 'Enter') inlineInput.blur();
+  if (e.key === 'Escape') { inlineState = null; inlineInput.style.display = 'none'; }
+});
 
 // ════════════════════════════════════════════════
 // EDIT DRAWER
@@ -617,16 +777,7 @@ async function saveEdit() {
 
   const newAm = { ...data.am_volumes, ...amVols };
   const newPm = { ...data.pm_volumes, ...pmVols };
-  const bothVols = {};
-  VOL_FIELDS.forEach(f => { bothVols[f] = `${newAm[f] ?? '0'}(${newPm[f] ?? '0'})`; });
-
-  // Re-populate SVGs — requires original template
-  // We'll use the current svg_am as a base and splice new values in
-  let svgAm   = rebuildSvg(data.svg_am,   newAm);
-  let svgPm   = rebuildSvg(data.svg_pm,   newPm);
-  let svgBoth = rebuildSvg(data.svg_both, bothVols);
-
-  const updates = { am_volumes: newAm, pm_volumes: newPm, svg_am: svgAm, svg_pm: svgPm, svg_both: svgBoth };
+  const updates = { am_volumes: newAm, pm_volumes: newPm };
   const { error } = await sb.from('intersections').update(updates).eq('id', editingId);
   if (error) { toast('Save failed: ' + error.message); return; }
 
@@ -637,16 +788,6 @@ async function saveEdit() {
   toast('Saved.');
 }
 
-// Re-splice values into an already-populated SVG string
-function rebuildSvg(svgStr, vols) {
-  if (!svgStr) return svgStr;
-  let svg = svgStr;
-  for (const [transform, field] of TMAP) {
-    const val = vols[field] ?? '0';
-    svg = spliceValue(svg, transform, val);
-  }
-  return svg;
-}
 
 // ════════════════════════════════════════════════
 // PORT / CONNECT
@@ -758,14 +899,17 @@ function renderConn(conn) {
   const mx = (p1.x+p2.x)/2, my = (p1.y+p2.y)/2;
 
   if (delta !== null) {
+    const dep = linkDeparture(getVols(fromData), conn.direction);
+    const arr = linkArrival(getVols(toData), conn.direction);
+    const diff = Math.abs(dep - arr);
     const balanced = delta <= tol;
     const badgeColor = balanced ? '#22c55e' : delta < tol*3 ? '#f97316' : '#ef4444';
     const fo = document.createElementNS('http://www.w3.org/2000/svg','foreignObject');
-    fo.setAttribute('x', mx-26); fo.setAttribute('y', my-13);
-    fo.setAttribute('width','52'); fo.setAttribute('height','26');
+    fo.setAttribute('x', mx-36); fo.setAttribute('y', my-18);
+    fo.setAttribute('width','72'); fo.setAttribute('height','36');
     const div = document.createElement('div');
-    div.style.cssText = `background:${badgeColor};color:#fff;border-radius:20px;font-size:10px;font-weight:700;text-align:center;line-height:26px;border:2px solid #fff;box-shadow:0 1px 5px rgba(0,0,0,.4);font-family:system-ui,sans-serif;`;
-    div.textContent = balanced ? '✓' : delta.toFixed(1)+'%';
+    div.style.cssText = `background:${badgeColor};color:#fff;border-radius:20px;font-size:13px;font-weight:700;text-align:center;line-height:36px;border:2px solid #fff;box-shadow:0 1px 5px rgba(0,0,0,.4);font-family:system-ui,sans-serif;width:72px;height:36px;box-sizing:border-box;overflow:visible;`;
+    div.textContent = balanced ? '✓' : `Δ${diff}`;
     fo.appendChild(div); g.appendChild(fo);
   }
 
@@ -910,19 +1054,14 @@ function openUpload() { if(!project){toast('Open a project first.');return;} doc
 function closeUpload() { document.getElementById('upload-overlay').style.display='none'; document.getElementById('upload-status').textContent=''; }
 
 async function doUpload() {
-  const svgFile = document.getElementById('svg-file').files[0];
   const csvFile = document.getElementById('csv-file').files[0];
   if (!csvFile) { toast('Select a CSV file.'); return; }
   const status = document.getElementById('upload-status');
-  status.innerHTML = '<span class="spinner"></span> Reading files…';
+  status.innerHTML = '<span class="spinner"></span> Reading…';
   try {
-    const csvRaw = await readText(csvFile);
-    const svgRaw = svgFile ? await readText(svgFile) : DEFAULT_SVG_TEMPLATE;
-    const template = prepareTemplate(svgRaw);
-    const rows = parseCSV(csvRaw);
-    status.innerHTML = '<span class="spinner"></span> Building SVGs…';
-    const records = rows.map((row,i) => buildRecord(template, row, i));
+    const rows = parseCSV(await readText(csvFile));
     status.innerHTML = '<span class="spinner"></span> Saving…';
+    const records = rows.map((row,i) => buildRecord(row, i));
     await sb.from('intersections').delete().eq('project_id', project.id);
     const { error } = await sb.from('intersections').insert(records);
     if (error) throw new Error(error.message);
@@ -935,35 +1074,6 @@ function readText(file) {
   return new Promise((res,rej)=>{ const r=new FileReader(); r.onload=e=>res(e.target.result); r.onerror=rej; r.readAsText(file); });
 }
 
-function prepareTemplate(raw) {
-  return raw.replace(/<\?xml[^?]*\?>\s*/g,'').trim();
-}
-
-const TMAP = [
-  ['translate(144.48 180.18) rotate(-90)', 'NBT'],
-  ['translate(130.89 170.87) rotate(-90)', 'NBL'],
-  ['translate(158.08 160.99) rotate(-90)', 'NBR'],
-  ['translate(132.16 95.3)',               'WBL'],
-  ['translate(132.16 81.4)',               'WBT'],
-  ['translate(132.16 67.5)',               'WBR'],
-  ['translate(52.64 132.04)',              'EBL'],
-  ['translate(63.03 145.94)',              'EBT'],
-  ['translate(63.03 159.85)',              'EBR'],
-  ['translate(76.78 86.46) rotate(-90)',   'SBT'],
-  ['translate(63.04 86.46) rotate(-90)',   'SBR'],
-  ['translate(90.51 86.46) rotate(-90)',   'SBL'],
-];
-
-function spliceValue(svg, transform, value) {
-  const needle = `transform="${transform}"><tspan x="0" y="0">`;
-  const idx = svg.indexOf(needle); if (idx===-1) return svg;
-  const vs = idx+needle.length, ve = svg.indexOf('</tspan>',vs); if (ve===-1) return svg;
-  return svg.slice(0,vs)+value+svg.slice(ve);
-}
-
-function setIntNumber(svg,v){ const n='cls-16" transform="translate(29.63 40.86)"><tspan x="0" y="0">'; const i=svg.indexOf(n); if(i===-1)return svg; const vs=i+n.length,ve=svg.indexOf('</tspan>',vs); return svg.slice(0,vs)+esc(v)+svg.slice(ve); }
-function setNsStreet(svg,v){ const n='cls-13" transform="translate(199.4 203.51) rotate(-90)"><tspan x="0" y="0">'; const i=svg.indexOf(n); if(i===-1)return svg; const vs=i+n.length,ve=svg.indexOf('</tspan>',vs); return svg.slice(0,vs)+esc(v)+svg.slice(ve); }
-function setEwStreet(svg,v){ const s=svg.indexOf('<text class="cls-12"'); if(s===-1)return svg; const e=svg.indexOf('</text>',s)+'</text>'.length; return svg.slice(0,s)+`<text class="cls-12" transform="translate(17.29 201.98)"><tspan x="0" y="0">${esc(v)}</tspan></text>`+svg.slice(e); }
 
 function parseCSV(text) {
   const lines = text.trim().split(/\r?\n/);
@@ -980,20 +1090,16 @@ function parseAmPm(raw) {
   return {am:'0',pm:'0'};
 }
 
-function buildRecord(template, row, idx) {
+function buildRecord(row, idx) {
   const intId=row['Intersection']||String(idx+1), ns=row['NS_Street']||'', ew=row['EW_Street']||'';
-  const amVols={},pmVols={},bothVols={};
+  const amVols={}, pmVols={};
   for (const f of VOL_FIELDS) {
     const {am,pm}=parseAmPm(row[f]||'0 (0)');
-    amVols[f]=am; pmVols[f]=pm; bothVols[f]=`${am}(${pm})`;
+    amVols[f]=am; pmVols[f]=pm;
   }
-  let svg=template;
-  svg=setIntNumber(svg,intId); svg=setNsStreet(svg,ns); svg=setEwStreet(svg,ew);
-  const makeVols = vols => { let s=svg; for(const [t,f] of TMAP) s=spliceValue(s,t,vols[f]??'0'); return s; };
   return {
     project_id:project.id, int_id:intId, ns_street:ns, ew_street:ew,
     am_volumes:amVols, pm_volumes:pmVols,
-    svg_am:makeVols(amVols), svg_pm:makeVols(pmVols), svg_both:makeVols(bothVols),
     x:60+(idx%4)*300, y:60+Math.floor(idx/4)*300, sort_order:idx,
   };
 }
