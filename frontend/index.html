@@ -289,9 +289,9 @@ function generateIntersectionSVG(vols, intId, nsStreet, ewStreet) {
   const t = (tx, field) => `<text class="cls-10" transform="${tx}" data-field="${field}"><tspan x="0" y="0">${v(field)}</tspan></text>`;
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 220.24 220.24">
 ${SVG_DEFS}${SVG_STATIC}
-  ${t('translate(144.48 158) rotate(-90)','NBT')}
-  ${t('translate(130.89 148) rotate(-90)','NBL')}
-  ${t('translate(158.08 138) rotate(-90)','NBR')}
+  ${t('translate(144.48 180.18) rotate(-90)','NBT')}
+  ${t('translate(130.89 170.87) rotate(-90)','NBL')}
+  ${t('translate(158.08 160.99) rotate(-90)','NBR')}
   ${t('translate(132.16 95.3)','WBL')}
   ${t('translate(132.16 81.4)','WBT')}
   ${t('translate(132.16 67.5)','WBR')}
