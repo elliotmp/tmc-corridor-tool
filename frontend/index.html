@@ -105,20 +105,11 @@
   .port.lit { opacity: 1 !important; background: #22c55e; }
   .port.snap-lit { opacity: 1 !important; background: #f97316; }
   .card.conn-hover { outline: 3px solid #f97316; }
-  .ld-btn { flex:1; padding:5px 2px; font-size:12px; border-radius:5px; }
-  .ld-btn.on { background:#3b82f6; color:#fff; }
-  .port[data-side=top]    { top: 0;    left: 50%; }
+.port[data-side=top]    { top: 0;    left: 50%; }
   .port[data-side=right]  { top: 50%;  left: 100%; }
   .port[data-side=bottom] { top: 100%; left: 50%; }
   .port[data-side=left]   { top: 50%;  left: 0; }
 
-  /* ── Links sidebar ── */
-  .link-row { padding: 8px 0; border-bottom: 1px solid var(--border); font-size: 12px; }
-  .link-names { margin-bottom: 4px; line-height: 1.4; }
-  .link-stats { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
-  .link-stats span { color: var(--muted); }
-  .link-badge { padding: 2px 8px; border-radius: 12px; color: #fff; font-weight: 700; font-size: 11px; }
-  .link-del { margin-left: auto; background: none; border: none; color: #ef4444; font-size: 16px; cursor: pointer; line-height: 1; padding: 0 2px; }
 
   /* ── Empty state ── */
   #empty { position: absolute; inset: 0; display: none; flex-direction: column; align-items: center; justify-content: center; gap: 12px; color: var(--muted); pointer-events: none; }
@@ -197,29 +188,9 @@
   <div class="sep"></div>
   <button onclick="autoArrange()">Auto Arrange</button>
   <button onclick="fitView()">Fit</button>
-  <button onclick="openLinkPanel()">+ Link</button>
   <button class="btn-accent" onclick="exportCSV()">Export CSV</button>
 </div>
 
-<!-- Link panel -->
-<div id="link-panel" style="display:none;position:fixed;top:60px;right:16px;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:16px;z-index:9000;width:260px;box-shadow:0 4px 20px rgba(0,0,0,.4)">
-  <div style="font-weight:700;margin-bottom:12px;font-size:13px;">Link Intersections</div>
-  <label style="font-size:11px;color:var(--muted)">FROM</label>
-  <select id="link-from" style="width:100%;margin-bottom:8px;padding:5px;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:5px"></select>
-  <label style="font-size:11px;color:var(--muted)">TO</label>
-  <select id="link-to" style="width:100%;margin-bottom:10px;padding:5px;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:5px"></select>
-  <label style="font-size:11px;color:var(--muted)">LINK DIRECTION (vehicles traveling…)</label>
-  <div style="display:flex;gap:6px;margin:6px 0 12px">
-    <button onclick="setLinkDir('eb')" id="ld-eb" class="ld-btn">→ EB</button>
-    <button onclick="setLinkDir('wb')" id="ld-wb" class="ld-btn">← WB</button>
-    <button onclick="setLinkDir('nb')" id="ld-nb" class="ld-btn">↑ NB</button>
-    <button onclick="setLinkDir('sb')" id="ld-sb" class="ld-btn">↓ SB</button>
-  </div>
-  <div style="display:flex;gap:8px">
-    <button onclick="doLink()" class="btn-accent" style="flex:1">Connect</button>
-    <button onclick="closeLinkPanel()">Cancel</button>
-  </div>
-</div>
 
 <!-- Inline SVG volume input -->
 <input id="svg-inline-input" type="number" min="0" />
@@ -228,6 +199,7 @@
 <div id="canvas-wrap">
   <div id="world">
     <svg id="svg-layer" width="8000" height="8000"></svg>
+    <div id="conn-hits" style="position:absolute;top:0;left:0;pointer-events:none"></div>
   </div>
   <div id="empty">
     <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" style="opacity:.15"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="12" y1="3" x2="12" y2="21"/></svg>
@@ -236,17 +208,6 @@
   <div id="del-btns" style="position:absolute;top:0;left:0;pointer-events:none"></div>
 </div>
 
-<!-- Links sidebar -->
-<div id="links-sidebar" style="display:none;position:fixed;right:0;top:48px;bottom:24px;width:300px;background:var(--surface);border-left:1px solid var(--border);overflow-y:auto;z-index:800;padding:12px 14px;box-sizing:border-box;">
-  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
-    <strong style="font-size:13px">Links</strong>
-    <div style="display:flex;gap:6px;align-items:center">
-      <button onclick="clearAllConns()" style="font-size:11px;padding:3px 8px;color:#ef4444;border-color:#ef4444">Clear all</button>
-      <button onclick="document.getElementById('links-sidebar').style.display='none'" style="background:none;border:none;color:var(--muted);font-size:18px;cursor:pointer;line-height:1">×</button>
-    </div>
-  </div>
-  <div id="links-list"></div>
-</div>
 
 <!-- Status bar -->
 <div id="statusbar">
@@ -297,14 +258,14 @@ function generateIntersectionSVG(vols, intId, nsStreet, ewStreet) {
   <line x1="204" y1="150" x2="300" y2="150" stroke="#4a4a60" stroke-width="1.5"/>
 
   <g color="#60a5fa">
-    ${ln(159,nbf,159,nby)}${ln(159,nby,138,nby)}${hd(138,nby,'L')}${V(159,nbm+8,'NBL','middle')}
+    ${ln(159,nbf,159,nby)}${ln(159,nby,138,nby)}${hd(138,nby,'L')}${V(155,nbm+22,'NBL','middle')}
     ${ln(177,nbf,177,nby)}${hd(177,nby,'U')}${V(177,nbm,'NBT','middle')}
-    ${ln(195,nbf,195,nby)}${ln(195,nby,216,nby)}${hd(216,nby,'R')}${V(195,nbm+8,'NBR','middle')}
+    ${ln(195,nbf,195,nby)}${ln(195,nby,216,nby)}${hd(216,nby,'R')}${V(199,nbm+22,'NBR','middle')}
   </g>
   <g color="#4ade80">
-    ${ln(141,sbf,141,sby)}${ln(141,sby,162,sby)}${hd(162,sby,'R')}${V(141,sbm-8,'SBL','middle')}
+    ${ln(141,sbf,141,sby)}${ln(141,sby,162,sby)}${hd(162,sby,'R')}${V(145,sbm-22,'SBL','middle')}
     ${ln(123,sbf,123,sby)}${hd(123,sby,'D')}${V(123,sbm,'SBT','middle')}
-    ${ln(105,sbf,105,sby)}${ln(105,sby,84,sby)}${hd(84,sby,'L')}${V(105,sbm-8,'SBR','middle')}
+    ${ln(105,sbf,105,sby)}${ln(105,sby,84,sby)}${hd(84,sby,'L')}${V(101,sbm-22,'SBR','middle')}
   </g>
   <g color="#fb923c">
     ${ln(ebf,159,ebx,159)}${ln(ebx,159,ebx,138)}${hd(ebx,138,'U')}${V(ebm,155,'EBL','middle')}
@@ -503,15 +464,18 @@ async function commitInlineEdit() {
   inlineInput.style.display = 'none';
   const { cardId, field, period } = inlineState;
   inlineState = null;
-  const val = String(Math.max(0, parseInt(inlineInput.value) || 0));
+  const val = Math.max(0, parseInt(inlineInput.value) || 0);
   const { data } = cards[cardId];
   const newAm = { ...data.am_volumes };
   const newPm = { ...data.pm_volumes };
-  if (period === 'am') newAm[field] = val; else newPm[field] = val;
+  if (period === 'am') newAm[field] = String(val); else newPm[field] = String(val);
   const updates = { am_volumes: newAm, pm_volumes: newPm };
   Object.assign(data, updates);
-  cards[cardId].el.querySelector('.svgholder').innerHTML = svgFor(data);
-  attachSvgClickHandlers(cardId);
+  // Patch just the single text node — don't re-render the whole SVG
+  // so that other onclick handlers on sibling text nodes stay alive
+  const svgEl = cards[cardId]?.el.querySelector('.svgholder svg');
+  const textNode = svgEl?.querySelector(`text[data-field="${field}"]`);
+  if (textNode) textNode.textContent = String(val);
   redrawConns();
   await sb.from('intersections').update(updates).eq('id', cardId);
 }
@@ -630,49 +594,6 @@ async function saveEdit() {
 }
 
 
-// ════════════════════════════════════════════════
-// LINK PANEL
-// ════════════════════════════════════════════════
-let linkDir = 'eb';
-
-function openLinkPanel() {
-  if (!project) { toast('Open a project first.'); return; }
-  const ids = Object.keys(cards);
-  if (ids.length < 2) { toast('Need at least 2 intersections.'); return; }
-  const fromSel = document.getElementById('link-from');
-  const toSel   = document.getElementById('link-to');
-  fromSel.innerHTML = '';
-  toSel.innerHTML   = '';
-  const sorted = Object.values(cards).sort((a,b) => a.data.sort_order - b.data.sort_order);
-  sorted.forEach(({data}) => {
-    const label = `#${data.int_id} — ${data.ns_street} & ${data.ew_street}`;
-    fromSel.appendChild(new Option(label, data.id));
-    toSel.appendChild(new Option(label, data.id));
-  });
-  if (sorted.length > 1) toSel.value = sorted[1].data.id;
-  setLinkDir('eb');
-  document.getElementById('link-panel').style.display = 'block';
-}
-
-function closeLinkPanel() {
-  document.getElementById('link-panel').style.display = 'none';
-}
-
-function setLinkDir(dir) {
-  linkDir = dir;
-  ['eb','wb','nb','sb'].forEach(d => document.getElementById('ld-'+d).classList.toggle('on', d===dir));
-}
-
-async function doLink() {
-  const fromId = document.getElementById('link-from').value;
-  const toId   = document.getElementById('link-to').value;
-  if (!fromId || !toId || fromId === toId) { toast('Pick two different intersections.'); return; }
-  const sides = { eb:{from:'right',to:'left'}, wb:{from:'left',to:'right'}, nb:{from:'top',to:'bottom'}, sb:{from:'bottom',to:'top'} };
-  const {from: fromSide, to: toSide} = sides[linkDir];
-  closeLinkPanel();
-  await persistConn(fromId, fromSide, toId, toSide, linkDir);
-  document.getElementById('links-sidebar').style.display = 'block';
-}
 
 // ════════════════════════════════════════════════
 // DRAG-TO-CONNECT
@@ -837,12 +758,14 @@ async function clearAllConns() {
 
 function redrawConns() {
   const tol = getTolerance();
-  const dirLabel = { eb:'→ EB', wb:'← WB', nb:'↑ NB', sb:'↓ SB' };
-  const S = 260; // card size in world px
+const S = 260; // card size in world px
 
   // ── SVG canvas connectors ──
   svgLayer.querySelectorAll('g[data-cid]').forEach(g => g.remove());
+  const connHits = document.getElementById('conn-hits');
+  connHits.innerHTML = '';
   const ns = 'http://www.w3.org/2000/svg';
+
   conns.forEach(c => {
     const fc = cards[c.from_intersection_id], tc = cards[c.to_intersection_id];
     if (!fc || !tc) return;
@@ -850,73 +773,86 @@ function redrawConns() {
     const tx2= parseFloat(tc.el.style.left), ty2= parseFloat(tc.el.style.top);
     let x1,y1,x2,y2;
     switch(c.direction){
-      case 'eb': x1=fx+S; y1=fy+S/2; x2=tx2;   y2=ty2+S/2; break;
-      case 'wb': x1=fx;   y1=fy+S/2; x2=tx2+S; y2=ty2+S/2; break;
-      case 'nb': x1=fx+S/2; y1=fy;   x2=tx2+S/2; y2=ty2+S; break;
-      case 'sb': x1=fx+S/2; y1=fy+S; x2=tx2+S/2; y2=ty2;   break;
+      case 'eb': x1=fx+S; y1=fy+S/2; x2=tx2;    y2=ty2+S/2; break;
+      case 'wb': x1=fx;   y1=fy+S/2; x2=tx2+S;  y2=ty2+S/2; break;
+      case 'nb': x1=fx+S/2; y1=fy;   x2=tx2+S/2; y2=ty2+S;  break;
+      case 'sb': x1=fx+S/2; y1=fy+S; x2=tx2+S/2; y2=ty2;    break;
       default: return;
     }
-    const col = DIR_COLOR[c.direction]||'#999';
-    const fwd = calcDelta(fc.data, tc.data, c.direction);
-    const rev = calcDelta(tc.data, fc.data, REVERSE[c.direction]);
+    const dx=x2-x1, dy=y2-y1, len=Math.sqrt(dx*dx+dy*dy)||1;
+    const px=-dy/len*7, py=dx/len*7; // perpendicular offset
     const mx=(x1+x2)/2, my=(y1+y2)/2;
+    const revDir = REVERSE[c.direction];
+    const fwd = calcDelta(fc.data, tc.data, c.direction);
+    const rev = calcDelta(tc.data, fc.data, revDir);
 
     const g = document.createElementNS(ns,'g'); g.dataset.cid = c.id;
 
-    const line = document.createElementNS(ns,'line');
-    ['x1','y1','x2','y2'].forEach((a,i)=>line.setAttribute(a,[x1,y1,x2,y2][i]));
-    line.setAttribute('stroke',col); line.setAttribute('stroke-width','8');
-    line.setAttribute('stroke-linecap','round'); line.setAttribute('opacity','0.8');
-    g.appendChild(line);
+    // Line 1 — primary direction
+    const l1 = document.createElementNS(ns,'line');
+    l1.setAttribute('x1',x1+px); l1.setAttribute('y1',y1+py);
+    l1.setAttribute('x2',x2+px); l1.setAttribute('y2',y2+py);
+    l1.setAttribute('stroke', DIR_COLOR[c.direction]||'#999');
+    l1.setAttribute('stroke-width','5'); l1.setAttribute('stroke-linecap','round');
+    g.appendChild(l1);
 
-    const mkBadge = (delta, dir, offsetY) => {
+    // Line 2 — reverse direction (drawn opposite way)
+    const l2 = document.createElementNS(ns,'line');
+    l2.setAttribute('x1',x2-px); l2.setAttribute('y1',y2-py);
+    l2.setAttribute('x2',x1-px); l2.setAttribute('y2',y1-py);
+    l2.setAttribute('stroke', DIR_COLOR[revDir]||'#999');
+    l2.setAttribute('stroke-width','5'); l2.setAttribute('stroke-linecap','round');
+    g.appendChild(l2);
+
+    // Center divider dash
+    const div = document.createElementNS(ns,'line');
+    div.setAttribute('x1',x1); div.setAttribute('y1',y1);
+    div.setAttribute('x2',x2); div.setAttribute('y2',y2);
+    div.setAttribute('stroke','rgba(255,255,255,0.15)'); div.setAttribute('stroke-width','1.5');
+    div.setAttribute('stroke-dasharray','8,6');
+    g.appendChild(div);
+
+    // Badges at 1/3 and 2/3 along line so they never overlap
+    const mkBadge = (delta, dir, bx, by) => {
       const pct = delta.dep>0 ? Math.abs(delta.dep-delta.arr)/((delta.dep+delta.arr)/2)*100 : 0;
-      const ok = pct <= tol;
-      const bc = ok ? '#22c55e' : pct < tol*3 ? '#f97316' : '#ef4444';
+      const ok = pct<=tol;
+      const bc = ok ? '#22c55e' : pct<tol*3 ? '#f97316' : '#ef4444';
       const label = (ok ? '✓ ' : `Δ${delta.diff} `) + dir.toUpperCase();
-      const r = document.createElementNS(ns,'rect');
-      r.setAttribute('x',mx-32); r.setAttribute('y',my+offsetY-11);
-      r.setAttribute('width','64'); r.setAttribute('height','20');
+      const r=document.createElementNS(ns,'rect');
+      r.setAttribute('x',bx-34); r.setAttribute('y',by-11);
+      r.setAttribute('width','68'); r.setAttribute('height','20');
       r.setAttribute('rx','10'); r.setAttribute('fill',bc);
       r.setAttribute('stroke','#1a1a2e'); r.setAttribute('stroke-width','2');
       g.appendChild(r);
-      const t = document.createElementNS(ns,'text');
-      t.setAttribute('x',mx); t.setAttribute('y',my+offsetY+4);
+      const t=document.createElementNS(ns,'text');
+      t.setAttribute('x',bx); t.setAttribute('y',by+4);
       t.setAttribute('text-anchor','middle'); t.setAttribute('font-size','11');
       t.setAttribute('font-weight','700'); t.setAttribute('fill','#fff');
       t.setAttribute('font-family','system-ui,sans-serif');
-      t.textContent = label;
+      t.textContent=label;
       g.appendChild(t);
     };
-    mkBadge(fwd, c.direction, -13);
-    mkBadge(rev, REVERSE[c.direction], 13);
+    mkBadge(fwd, c.direction, x1+dx/3, y1+dy/3);
+    mkBadge(rev, revDir,      x1+dx*2/3, y1+dy*2/3);
 
     svgLayer.appendChild(g);
+
+    // Hit area spans full connector length for easy dblclick-to-delete
+    const hit = document.createElement('div');
+    const isH = Math.abs(dx) > Math.abs(dy);
+    if (isH) {
+      hit.style.cssText = `position:absolute;left:${Math.min(x1,x2)}px;top:${my-18}px;width:${Math.abs(dx)}px;height:36px;cursor:pointer;pointer-events:all;`;
+    } else {
+      hit.style.cssText = `position:absolute;left:${mx-18}px;top:${Math.min(y1,y2)}px;width:36px;height:${Math.abs(dy)}px;cursor:pointer;pointer-events:all;`;
+    }
+    hit.title = 'Double-click to delete link';
+    hit.addEventListener('dblclick', e => {
+      e.stopPropagation();
+      if (confirm('Delete this link?')) removeConn(c.id);
+    });
+    connHits.appendChild(hit);
   });
 
-  // ── Sidebar ──
-  const sidebar = document.getElementById('links-list');
-  if (!sidebar) return;
-  if (!conns.length) { sidebar.innerHTML = '<div style="color:var(--muted);font-size:12px;padding:8px 0">No links yet. Use + Link to connect intersections.</div>'; return; }
-  sidebar.innerHTML = conns.map(c => {
-    const fromData = cards[c.from_intersection_id]?.data;
-    const toData   = cards[c.to_intersection_id]?.data;
-    if (!fromData || !toData) return '';
-    const {dep, arr, diff} = calcDelta(fromData, toData, c.direction);
-    const pct = dep > 0 ? Math.round(Math.abs(dep-arr)/((dep+arr)/2)*100) : 0;
-    const balanced = pct <= tol;
-    const color = balanced ? '#22c55e' : pct < tol*3 ? '#f97316' : '#ef4444';
-    const fromLabel = `#${fromData.int_id} ${fromData.ew_street}`;
-    const toLabel   = `#${toData.int_id} ${toData.ew_street}`;
-    return `<div class="link-row" data-cid="${c.id}">
-      <div class="link-names">${esc(fromLabel)} <span style="color:${DIR_COLOR[c.direction]}">${dirLabel[c.direction]||c.direction}</span> ${esc(toLabel)}</div>
-      <div class="link-stats">
-        <span>Dep: ${dep}</span><span>Arr: ${arr}</span>
-        <span class="link-badge" style="background:${color}">${balanced ? '✓' : 'Δ'+diff}</span>
-        <button class="link-del" onclick="removeConn('${c.id}')">×</button>
-      </div>
-    </div>`;
-  }).join('');
 }
 
 // ════════════════════════════════════════════════
@@ -924,7 +860,7 @@ function redrawConns() {
 // ════════════════════════════════════════════════
 wrap.addEventListener('wheel', e => {
   e.preventDefault();
-  const f = e.deltaY<0?1.1:0.9, r = wrap.getBoundingClientRect();
+  const f = e.deltaY<0?1.05:0.952, r = wrap.getBoundingClientRect();
   const mx = e.clientX-r.left, my = e.clientY-r.top;
   tx = mx-(mx-tx)*f; ty = my-(my-ty)*f;
   scale = Math.min(4,Math.max(0.1,scale*f));
