@@ -229,7 +229,7 @@ function generateIntersectionSVG(vols, intId, nsStreet, ewStreet) {
   const G = f => parseInt(vols?.[f] ?? 0);
   const E = s => String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
   const V = (x, y, f, anchor) =>
-    `<text x="${x}" y="${y}" data-field="${f}" fill="currentColor" font-size="13" font-weight="700" font-family="'Courier New',monospace" text-anchor="${anchor}" stroke="#1a1a2e" stroke-width="4" paint-order="stroke fill">${G(f)}</text>`;
+    `<text x="${x}" y="${y}" data-field="${f}" fill="currentColor" font-size="13" font-weight="700" font-family="'Courier New',monospace" text-anchor="${anchor}" stroke="#1a1a2e" stroke-width="6" paint-order="stroke fill">${G(f)}</text>`;
   const ln = (x1,y1,x2,y2) => `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/>`;
   const hd = (px,py,dir) => { const S=6; const pts=dir==='U'?`${px-S},${py+S} ${px},${py} ${px+S},${py+S}`:dir==='D'?`${px-S},${py-S} ${px},${py} ${px+S},${py-S}`:dir==='L'?`${px+S},${py-S} ${px},${py} ${px+S},${py+S}`:`${px-S},${py-S} ${px},${py} ${px-S},${py+S}`; return `<polyline points="${pts}" stroke="currentColor" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>`; };
 
@@ -740,7 +740,7 @@ function linkArrival(vols, dir) {
 function calcDelta(fromData, toData, dir) {
   const dep = linkDeparture(getVols(fromData), dir);
   const arr = linkArrival(getVols(toData), dir);
-  return { dep, arr, diff: Math.abs(dep - arr) };
+  return { dep, arr, diff: dep - arr };
 }
 
 const REVERSE = { eb:'wb', wb:'eb', nb:'sb', sb:'nb' };
@@ -793,7 +793,7 @@ const S = 260; // card size in world px
     const rev = calcDelta(tc.data, fc.data, revDir);
 
     const lineColor = (delta) => {
-      const pct = delta.dep>0 ? Math.abs(delta.dep-delta.arr)/((delta.dep+delta.arr)/2)*100 : 0;
+      const pct = delta.dep>0 ? Math.abs(delta.diff)/((delta.dep+delta.arr)/2)*100 : 0;
       return (pct<=tol) ? '#22c55e' : '#ef4444';
     };
 
@@ -827,11 +827,12 @@ const S = 260; // card size in world px
 
     // Badge centered on its own lane line at midpoint
     const mkBadge = (delta, dir, lx, ly) => {
-      const pct = delta.dep>0 ? Math.abs(delta.dep-delta.arr)/((delta.dep+delta.arr)/2)*100 : 0;
+      const pct = delta.dep>0 ? Math.abs(delta.diff)/((delta.dep+delta.arr)/2)*100 : 0;
       const ok = pct<=tol;
       const bc = ok ? '#22c55e' : '#ef4444';
       const arrow = DIR_ARROW[dir] || '';
-      const label = ok ? `${arrow} ✓` : `${arrow} Δ${delta.diff}`;
+      const sign = delta.diff > 0 ? '+' : '';
+      const label = ok ? `${arrow} ✓` : `${arrow} ${sign}${delta.diff}`;
       const w = 72, h = 22;
       const r=document.createElementNS(ns,'rect');
       r.setAttribute('x',lx-w/2); r.setAttribute('y',ly-h/2);
@@ -1041,8 +1042,10 @@ function handleIntChange({eventType,new:n,old:o}) {
   if(eventType==='UPDATE'&&cards[n.id]){
     cards[n.id].el.style.left=n.x+'px'; cards[n.id].el.style.top=n.y+'px';
     cards[n.id].data={...cards[n.id].data,...n};
-    cards[n.id].el.querySelector('.svgholder').innerHTML=svgFor(cards[n.id].data);
-    attachSvgClickHandlers(n.id);
+    if (!inlineState || inlineState.cardId !== n.id) {
+      cards[n.id].el.querySelector('.svgholder').innerHTML=svgFor(cards[n.id].data);
+      attachSvgClickHandlers(n.id);
+    }
     redrawConns();
   }
   if(eventType==='INSERT'&&!cards[n.id]){ addCard(n); document.getElementById('empty').style.display='none'; }
