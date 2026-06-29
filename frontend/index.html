@@ -105,6 +105,8 @@
   .port.lit { opacity: 1 !important; background: #22c55e; }
   .port.snap-lit { opacity: 1 !important; background: #f97316; }
   .card.conn-hover { outline: 3px solid #f97316; }
+  .ld-btn { flex:1; padding:5px 2px; font-size:12px; border-radius:5px; }
+  .ld-btn.on { background:#3b82f6; color:#fff; }
   .port[data-side=top]    { top: 0;    left: 50%; }
   .port[data-side=right]  { top: 50%;  left: 100%; }
   .port[data-side=bottom] { top: 100%; left: 50%; }
@@ -192,7 +194,28 @@
   <div class="sep"></div>
   <button onclick="autoArrange()">Auto Arrange</button>
   <button onclick="fitView()">Fit</button>
+  <button onclick="openLinkPanel()">+ Link</button>
   <button class="btn-accent" onclick="exportCSV()">Export CSV</button>
+</div>
+
+<!-- Link panel -->
+<div id="link-panel" style="display:none;position:fixed;top:60px;right:16px;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:16px;z-index:9000;width:260px;box-shadow:0 4px 20px rgba(0,0,0,.4)">
+  <div style="font-weight:700;margin-bottom:12px;font-size:13px;">Link Intersections</div>
+  <label style="font-size:11px;color:var(--muted)">FROM</label>
+  <select id="link-from" style="width:100%;margin-bottom:8px;padding:5px;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:5px"></select>
+  <label style="font-size:11px;color:var(--muted)">TO</label>
+  <select id="link-to" style="width:100%;margin-bottom:10px;padding:5px;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:5px"></select>
+  <label style="font-size:11px;color:var(--muted)">LINK DIRECTION (vehicles traveling…)</label>
+  <div style="display:flex;gap:6px;margin:6px 0 12px">
+    <button onclick="setLinkDir('eb')" id="ld-eb" class="ld-btn">→ EB</button>
+    <button onclick="setLinkDir('wb')" id="ld-wb" class="ld-btn">← WB</button>
+    <button onclick="setLinkDir('nb')" id="ld-nb" class="ld-btn">↑ NB</button>
+    <button onclick="setLinkDir('sb')" id="ld-sb" class="ld-btn">↓ SB</button>
+  </div>
+  <div style="display:flex;gap:8px">
+    <button onclick="doLink()" class="btn-accent" style="flex:1">Connect</button>
+    <button onclick="closeLinkPanel()">Cancel</button>
+  </div>
 </div>
 
 <!-- Inline SVG volume input -->
@@ -638,6 +661,49 @@ async function saveEdit() {
   toast('Saved.');
 }
 
+
+// ════════════════════════════════════════════════
+// LINK PANEL
+// ════════════════════════════════════════════════
+let linkDir = 'eb';
+
+function openLinkPanel() {
+  if (!project) { toast('Open a project first.'); return; }
+  const ids = Object.keys(cards);
+  if (ids.length < 2) { toast('Need at least 2 intersections.'); return; }
+  const fromSel = document.getElementById('link-from');
+  const toSel   = document.getElementById('link-to');
+  fromSel.innerHTML = '';
+  toSel.innerHTML   = '';
+  const sorted = Object.values(cards).sort((a,b) => a.data.sort_order - b.data.sort_order);
+  sorted.forEach(({data}) => {
+    const label = `#${data.int_id} — ${data.ns_street} & ${data.ew_street}`;
+    fromSel.appendChild(new Option(label, data.id));
+    toSel.appendChild(new Option(label, data.id));
+  });
+  if (sorted.length > 1) toSel.value = sorted[1].data.id;
+  setLinkDir('eb');
+  document.getElementById('link-panel').style.display = 'block';
+}
+
+function closeLinkPanel() {
+  document.getElementById('link-panel').style.display = 'none';
+}
+
+function setLinkDir(dir) {
+  linkDir = dir;
+  ['eb','wb','nb','sb'].forEach(d => document.getElementById('ld-'+d).classList.toggle('on', d===dir));
+}
+
+async function doLink() {
+  const fromId = document.getElementById('link-from').value;
+  const toId   = document.getElementById('link-to').value;
+  if (!fromId || !toId || fromId === toId) { toast('Pick two different intersections.'); return; }
+  const sides = { eb:{from:'right',to:'left'}, wb:{from:'left',to:'right'}, nb:{from:'top',to:'bottom'}, sb:{from:'bottom',to:'top'} };
+  const {from: fromSide, to: toSide} = sides[linkDir];
+  closeLinkPanel();
+  await persistConn(fromId, fromSide, toId, toSide, linkDir);
+}
 
 // ════════════════════════════════════════════════
 // DRAG-TO-CONNECT
