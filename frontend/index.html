@@ -682,6 +682,7 @@ function startConnDrag(e, cardId, side) {
   dragLine.setAttribute('x1', p.x); dragLine.setAttribute('y1', p.y);
   dragLine.setAttribute('x2', p.x); dragLine.setAttribute('y2', p.y);
   svgLayer.appendChild(dragLine);
+  svgLayer.style.pointerEvents = 'none'; // let mouse events reach cards underneath
   document.getElementById('card-'+cardId)?.querySelectorAll('.port').forEach(p=>{ if(p.dataset.side===side) p.classList.add('lit'); });
 }
 
@@ -704,6 +705,7 @@ document.addEventListener('mouseup', e => {
   // Clean up drag state first
   document.querySelectorAll('.port.lit, .card.conn-hover').forEach(el=>{ el.classList.remove('lit'); el.classList.remove('conn-hover'); });
   if (dragLine) { dragLine.remove(); dragLine=null; }
+  svgLayer.style.pointerEvents = '';
   connFrom = null;
 
   const el = document.elementFromPoint(e.clientX, e.clientY);
@@ -736,8 +738,9 @@ function guessDir(fromId, toId) {
 async function persistConn(fromId, fromSide, toId, toSide, dir) {
   const rec = { project_id: project.id, from_intersection_id: fromId, from_side: fromSide, to_intersection_id: toId, to_side: toSide, direction: dir };
   const { data, error } = await sb.from('connectors').insert(rec).select().single();
-  if (error) { toast('Error saving connector'); return; }
+  if (error) { toast('Error: ' + error.message); console.error(error); return; }
   conns.push(data); renderConn(data);
+  toast(`Connected — ${dir.toUpperCase()} link`);
 }
 
 // ════════════════════════════════════════════════
