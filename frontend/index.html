@@ -104,6 +104,7 @@
   .card:hover .port { opacity: 1; }
   .port.lit { opacity: 1 !important; background: #22c55e; }
   .port.snap-lit { opacity: 1 !important; background: #f97316; }
+  .card.conn-hover { outline: 3px solid #f97316; }
   .port[data-side=top]    { top: 0;    left: 50%; }
   .port[data-side=right]  { top: 50%;  left: 100%; }
   .port[data-side=bottom] { top: 100%; left: 50%; }
@@ -658,18 +659,15 @@ function portWorldPos(cardId, side) {
   return { top:{x:x+w/2,y}, right:{x:x+w,y:y+h/2}, bottom:{x:x+w/2,y:y+h}, left:{x,y:y+h/2} }[side];
 }
 
-// Find closest port on any other card within snap distance (world px)
-function snapPort(wx, wy, excludeCardId, snapDist=30) {
-  let best = null, bestD = Infinity;
+// Find which card the world point is inside (or nearest port within 60px)
+function cardAtWorld(wx, wy, excludeCardId) {
   for (const [id, {el}] of Object.entries(cards)) {
     if (id === excludeCardId) continue;
-    for (const side of ['top','right','bottom','left']) {
-      const p = portWorldPos(id, side); if (!p) continue;
-      const d = Math.hypot(p.x-wx, p.y-wy);
-      if (d < snapDist && d < bestD) { bestD=d; best={cardId:id, side, ...p}; }
-    }
+    const x = parseFloat(el.style.left), y = parseFloat(el.style.top);
+    const w = el.offsetWidth, h = el.offsetHeight;
+    if (wx >= x-20 && wx <= x+w+20 && wy >= y-20 && wy <= y+h+20) return id;
   }
-  return best;
+  return null;
 }
 
 function startConnDrag(e, cardId, side) {
@@ -690,24 +688,25 @@ function startConnDrag(e, cardId, side) {
 document.addEventListener('mousemove', e => {
   if (!connFrom || !dragLine) return;
   const {x,y} = toWorld(e.clientX, e.clientY);
-  const snap = snapPort(x, y, connFrom.cardId);
-  dragLine.setAttribute('x2', snap ? snap.x : x);
-  dragLine.setAttribute('y2', snap ? snap.y : y);
-  document.querySelectorAll('.port.snap-lit').forEach(p=>p.classList.remove('snap-lit'));
-  if (snap) {
-    cards[snap.cardId]?.el.querySelectorAll('.port').forEach(p=>{ if(p.dataset.side===snap.side) p.classList.add('snap-lit'); });
-  }
+  dragLine.setAttribute('x2', x);
+  dragLine.setAttribute('y2', y);
+  // Highlight target card
+  document.querySelectorAll('.card.conn-hover').forEach(el=>el.classList.remove('conn-hover'));
+  const targetId = cardAtWorld(x, y, connFrom.cardId);
+  if (targetId) cards[targetId]?.el.classList.add('conn-hover');
 });
 
 document.addEventListener('mouseup', e => {
   if (!connFrom) return;
   const {x,y} = toWorld(e.clientX, e.clientY);
-  const snap = snapPort(x, y, connFrom.cardId);
-  if (snap) {
-    const dir = guessDir(connFrom.cardId, snap.cardId);
-    persistConn(connFrom.cardId, connFrom.side, snap.cardId, snap.side, dir);
+  const targetId = cardAtWorld(x, y, connFrom.cardId);
+  if (targetId) {
+    const dir = guessDir(connFrom.cardId, targetId);
+    const fromSide = connFrom.side;
+    const toSide = { top:'bottom', bottom:'top', left:'right', right:'left' }[fromSide];
+    persistConn(connFrom.cardId, fromSide, targetId, toSide, dir);
   }
-  document.querySelectorAll('.port.lit, .port.snap-lit').forEach(p=>{ p.classList.remove('lit'); p.classList.remove('snap-lit'); });
+  document.querySelectorAll('.port.lit, .card.conn-hover').forEach(el=>{ el.classList.remove('lit'); el.classList.remove('conn-hover'); });
   if (dragLine) { dragLine.remove(); dragLine=null; }
   connFrom = null;
 });
