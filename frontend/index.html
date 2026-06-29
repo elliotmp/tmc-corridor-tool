@@ -265,7 +265,7 @@ function generateIntersectionSVG(vols, intId, nsStreet, ewStreet) {
   const G = f => parseInt(vols?.[f] ?? 0);
   const E = s => String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
   const V = (x, y, f, anchor) =>
-    `<text x="${x}" y="${y}" data-field="${f}" fill="currentColor" font-size="10" font-weight="700" font-family="'Courier New',monospace" text-anchor="${anchor}" stroke="#1a1a2e" stroke-width="3" paint-order="stroke fill">${G(f)}</text>`;
+    `<text x="${x}" y="${y}" data-field="${f}" fill="currentColor" font-size="13" font-weight="700" font-family="'Courier New',monospace" text-anchor="${anchor}" stroke="#1a1a2e" stroke-width="4" paint-order="stroke fill">${G(f)}</text>`;
   const ln = (x1,y1,x2,y2) => `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/>`;
   const hd = (px,py,dir) => { const S=6; const pts=dir==='U'?`${px-S},${py+S} ${px},${py} ${px+S},${py+S}`:dir==='D'?`${px-S},${py-S} ${px},${py} ${px+S},${py-S}`:dir==='L'?`${px+S},${py-S} ${px},${py} ${px+S},${py+S}`:`${px-S},${py-S} ${px},${py} ${px-S},${py+S}`; return `<polyline points="${pts}" stroke="currentColor" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>`; };
 
@@ -825,6 +825,58 @@ async function removeConn(id) {
 function redrawConns() {
   const tol = getTolerance();
   const dirLabel = { eb:'→ EB', wb:'← WB', nb:'↑ NB', sb:'↓ SB' };
+  const S = 260; // card size in world px
+
+  // ── SVG canvas connectors ──
+  svgLayer.querySelectorAll('g[data-cid]').forEach(g => g.remove());
+  const ns = 'http://www.w3.org/2000/svg';
+  conns.forEach(c => {
+    const fc = cards[c.from_intersection_id], tc = cards[c.to_intersection_id];
+    if (!fc || !tc) return;
+    const fx = parseFloat(fc.el.style.left), fy = parseFloat(fc.el.style.top);
+    const tx2= parseFloat(tc.el.style.left), ty2= parseFloat(tc.el.style.top);
+    let x1,y1,x2,y2;
+    switch(c.direction){
+      case 'eb': x1=fx+S; y1=fy+S/2; x2=tx2;   y2=ty2+S/2; break;
+      case 'wb': x1=fx;   y1=fy+S/2; x2=tx2+S; y2=ty2+S/2; break;
+      case 'nb': x1=fx+S/2; y1=fy;   x2=tx2+S/2; y2=ty2+S; break;
+      case 'sb': x1=fx+S/2; y1=fy+S; x2=tx2+S/2; y2=ty2;   break;
+      default: return;
+    }
+    const col = DIR_COLOR[c.direction]||'#999';
+    const {dep,arr,diff} = calcDelta(fc.data, tc.data, c.direction);
+    const pct = dep>0 ? Math.abs(dep-arr)/((dep+arr)/2)*100 : 0;
+    const balanced = pct <= tol;
+    const bCol = balanced ? '#22c55e' : pct < tol*3 ? '#f97316' : '#ef4444';
+    const mx=(x1+x2)/2, my=(y1+y2)/2;
+
+    const g = document.createElementNS(ns,'g'); g.dataset.cid = c.id;
+
+    const line = document.createElementNS(ns,'line');
+    ['x1','y1','x2','y2'].forEach((a,i)=>line.setAttribute(a,[x1,y1,x2,y2][i]));
+    line.setAttribute('stroke',col); line.setAttribute('stroke-width','8');
+    line.setAttribute('stroke-linecap','round'); line.setAttribute('opacity','0.8');
+    g.appendChild(line);
+
+    const rect = document.createElementNS(ns,'rect');
+    rect.setAttribute('x',mx-26); rect.setAttribute('y',my-13);
+    rect.setAttribute('width','52'); rect.setAttribute('height','26');
+    rect.setAttribute('rx','13'); rect.setAttribute('fill',bCol);
+    rect.setAttribute('stroke','#1a1a2e'); rect.setAttribute('stroke-width','2');
+    g.appendChild(rect);
+
+    const txt = document.createElementNS(ns,'text');
+    txt.setAttribute('x',mx); txt.setAttribute('y',my+5);
+    txt.setAttribute('text-anchor','middle'); txt.setAttribute('font-size','12');
+    txt.setAttribute('font-weight','700'); txt.setAttribute('fill','#fff');
+    txt.setAttribute('font-family','system-ui,sans-serif');
+    txt.textContent = balanced ? '✓ balanced' : `Δ ${diff}`;
+    g.appendChild(txt);
+
+    svgLayer.appendChild(g);
+  });
+
+  // ── Sidebar ──
   const sidebar = document.getElementById('links-list');
   if (!sidebar) return;
   if (!conns.length) { sidebar.innerHTML = '<div style="color:var(--muted);font-size:12px;padding:8px 0">No links yet. Use + Link to connect intersections.</div>'; return; }
