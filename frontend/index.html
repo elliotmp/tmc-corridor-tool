@@ -103,6 +103,7 @@
   .port { position: absolute; width: 13px; height: 13px; border-radius: 50%; background: #3b82f6; border: 2px solid white; transform: translate(-50%,-50%); opacity: 0; transition: opacity .12s; cursor: crosshair; pointer-events: all; z-index: 10; }
   .card:hover .port { opacity: 1; }
   .port.lit { opacity: 1 !important; background: #22c55e; }
+  .port.target-lit { opacity: 1 !important; background: #f97316; }
   .port[data-side=top]    { top: 0;    left: 50%; }
   .port[data-side=right]  { top: 50%;  left: 100%; }
   .port[data-side=bottom] { top: 100%; left: 50%; }
@@ -636,30 +637,71 @@ async function saveEdit() {
 
 
 // ════════════════════════════════════════════════
-// PORT / CONNECT
+// PORT / CONNECT  (drag to connect)
 // ════════════════════════════════════════════════
-document.addEventListener('click', e => {
+let dragLine = null; // live preview SVG line
+
+function portCenter(port) {
+  const r = port.getBoundingClientRect();
+  return { x: r.left + r.width/2, y: r.top + r.height/2 };
+}
+
+function nearestPort(x, y, excludeCardId) {
+  let best = null, bestDist = Infinity;
+  document.querySelectorAll('.port').forEach(p => {
+    if (p.dataset.card === excludeCardId) return;
+    const c = portCenter(p);
+    const d = Math.hypot(c.x - x, c.y - y);
+    if (d < bestDist) { bestDist = d; best = p; }
+  });
+  return bestDist < 40 ? best : null;
+}
+
+document.addEventListener('mousedown', e => {
   const port = e.target.closest('.port');
   if (!port) return;
-  e.stopPropagation();
-  const cardId = port.dataset.card, side = port.dataset.side;
-  if (!connFrom) {
-    connFrom = { cardId, side };
-    port.classList.add('lit');
-    wrap.classList.add('connecting');
-    setHint('Click another card\'s port — Esc to cancel');
-  } else {
-    if (connFrom.cardId === cardId) { cancelConn(); return; }
-    const dir = guessDir(connFrom.cardId, cardId);
-    persistConn(connFrom.cardId, connFrom.side, cardId, side, dir);
-    cancelConn();
+  e.stopPropagation(); e.preventDefault();
+  connFrom = { cardId: port.dataset.card, side: port.dataset.side };
+  port.classList.add('lit');
+  wrap.classList.add('connecting');
+  setHint('Drag to another card\'s port — Esc to cancel');
+
+  // Create preview line on the SVG layer
+  dragLine = document.createElementNS('http://www.w3.org/2000/svg','line');
+  dragLine.setAttribute('stroke','#94a3b8'); dragLine.setAttribute('stroke-width','2');
+  dragLine.setAttribute('stroke-dasharray','6,4'); dragLine.setAttribute('pointer-events','none');
+  const c = portCenter(port);
+  dragLine.setAttribute('x1', c.x); dragLine.setAttribute('y1', c.y);
+  dragLine.setAttribute('x2', c.x); dragLine.setAttribute('y2', c.y);
+  svgLayer.appendChild(dragLine);
+}, true);
+
+document.addEventListener('mousemove', e => {
+  if (!connFrom || !dragLine) return;
+  dragLine.setAttribute('x2', e.clientX); dragLine.setAttribute('y2', e.clientY);
+  // Highlight nearest port
+  document.querySelectorAll('.port.target-lit').forEach(p => p.classList.remove('target-lit'));
+  const near = nearestPort(e.clientX, e.clientY, connFrom.cardId);
+  if (near) near.classList.add('target-lit');
+});
+
+document.addEventListener('mouseup', e => {
+  if (!connFrom) return;
+  const near = nearestPort(e.clientX, e.clientY, connFrom.cardId);
+  if (near && near.dataset.card !== connFrom.cardId) {
+    const dir = guessDir(connFrom.cardId, near.dataset.card);
+    persistConn(connFrom.cardId, connFrom.side, near.dataset.card, near.dataset.side, dir);
   }
+  cancelConn();
 });
 
 document.addEventListener('keydown', e => { if (e.key === 'Escape') cancelConn(); });
 
 function cancelConn() {
-  document.querySelectorAll('.port.lit').forEach(p => p.classList.remove('lit'));
+  document.querySelectorAll('.port.lit, .port.target-lit').forEach(p => {
+    p.classList.remove('lit'); p.classList.remove('target-lit');
+  });
+  if (dragLine) { dragLine.remove(); dragLine = null; }
   connFrom = null; wrap.classList.remove('connecting'); setHint('');
 }
 
