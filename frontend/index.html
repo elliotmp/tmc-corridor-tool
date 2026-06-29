@@ -710,7 +710,7 @@ document.addEventListener('mouseup', e => {
 
   const el = document.elementFromPoint(e.clientX, e.clientY);
   const targetCard = el?.closest('.card');
-  if (!targetCard) return;
+  if (!targetCard) { toast('Miss — dropped on: ' + (el?.tagName||'nothing')); return; }
   const targetId = targetCard.id.replace('card-', '');
   if (targetId === fromId) return;
 
