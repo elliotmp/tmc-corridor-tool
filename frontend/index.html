@@ -705,16 +705,17 @@ document.addEventListener('mouseup', e => {
   // Clean up drag state first
   document.querySelectorAll('.port.lit, .card.conn-hover').forEach(el=>{ el.classList.remove('lit'); el.classList.remove('conn-hover'); });
   if (dragLine) { dragLine.remove(); dragLine=null; }
-  svgLayer.style.pointerEvents = '';
   connFrom = null;
 
+  // Hit-test BEFORE restoring pointer events (SVG is still non-blocking)
   const el = document.elementFromPoint(e.clientX, e.clientY);
+  svgLayer.style.pointerEvents = '';
+
   const targetCard = el?.closest('.card');
-  if (!targetCard) { toast('Miss — dropped on: ' + (el?.tagName||'nothing')); return; }
+  if (!targetCard) return;
   const targetId = targetCard.id.replace('card-', '');
   if (targetId === fromId) return;
 
-  // Direction based on relative card positions
   const dir = guessDir(fromId, targetId);
   const sides = { eb:{from:'right',to:'left'}, wb:{from:'left',to:'right'}, nb:{from:'top',to:'bottom'}, sb:{from:'bottom',to:'top'} };
   const {from: fromSide, to: toSide} = sides[dir];
