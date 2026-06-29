@@ -265,7 +265,7 @@ function generateIntersectionSVG(vols, intId, nsStreet, ewStreet) {
   const G = f => parseInt(vols?.[f] ?? 0);
   const E = s => String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
   const V = (x, y, f, anchor) =>
-    `<text x="${x}" y="${y}" data-field="${f}" fill="currentColor" font-size="10" font-weight="700" font-family="'Courier New',monospace" text-anchor="${anchor}">${G(f)}</text>`;
+    `<text x="${x}" y="${y}" data-field="${f}" fill="currentColor" font-size="10" font-weight="700" font-family="'Courier New',monospace" text-anchor="${anchor}" stroke="#1a1a2e" stroke-width="3" paint-order="stroke fill">${G(f)}</text>`;
   const ln = (x1,y1,x2,y2) => `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/>`;
   const hd = (px,py,dir) => { const S=6; const pts=dir==='U'?`${px-S},${py+S} ${px},${py} ${px+S},${py+S}`:dir==='D'?`${px-S},${py-S} ${px},${py} ${px+S},${py-S}`:dir==='L'?`${px+S},${py-S} ${px},${py} ${px+S},${py+S}`:`${px-S},${py-S} ${px},${py} ${px-S},${py+S}`; return `<polyline points="${pts}" stroke="currentColor" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>`; };
 
@@ -782,6 +782,32 @@ async function persistConn(fromId, fromSide, toId, toSide, dir) {
 const DIR_COLOR = { eb: '#3b82f6', wb: '#ef4444', nb: '#22c55e', sb: '#a855f7' };
 const THRU_KEY  = { eb: 'EBT', wb: 'WBT', nb: 'NBT', sb: 'SBT' };
 
+function getVols(d) {
+  return scenario === 'pm' ? (d.pm_volumes || {}) : (d.am_volumes || {});
+}
+
+function linkDeparture(vols, dir) {
+  const v = f => parseInt(vols[f] ?? 0);
+  switch (dir) {
+    case 'eb': return v('EBT') + v('NBR') + v('SBL');
+    case 'wb': return v('WBT') + v('NBL') + v('SBR');
+    case 'nb': return v('NBT') + v('EBL') + v('WBR');
+    case 'sb': return v('SBT') + v('WBL') + v('EBR');
+  }
+  return 0;
+}
+
+function linkArrival(vols, dir) {
+  const v = f => parseInt(vols[f] ?? 0);
+  switch (dir) {
+    case 'eb': return v('EBT') + v('EBL') + v('EBR');
+    case 'wb': return v('WBT') + v('WBL') + v('WBR');
+    case 'nb': return v('NBT') + v('NBL') + v('NBR');
+    case 'sb': return v('SBT') + v('SBL') + v('SBR');
+  }
+  return 0;
+}
+
 function calcDelta(fromData, toData, dir) {
   const dep = linkDeparture(getVols(fromData), dir);
   const arr = linkArrival(getVols(toData), dir);
@@ -846,7 +872,7 @@ document.addEventListener('mousemove', e => {
   if (dragging) {
     const dx=(e.clientX-dragging.sx)/scale, dy=(e.clientY-dragging.sy)/scale;
     const el=cards[dragging.id]?.el; if(el){el.style.left=(dragging.cx+dx)+'px';el.style.top=(dragging.cy+dy)+'px';}
-    redrawConns(); redrawConns();
+    redrawConns();
   }
 });
 
