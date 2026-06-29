@@ -229,7 +229,7 @@ function generateIntersectionSVG(vols, intId, nsStreet, ewStreet) {
   const G = f => parseInt(vols?.[f] ?? 0);
   const E = s => String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
   const V = (x, y, f, anchor) =>
-    `<text x="${x}" y="${y}" data-field="${f}" fill="currentColor" font-size="16" font-weight="700" font-family="'Courier New',monospace" text-anchor="${anchor}" stroke="#1a1a2e" stroke-width="6" paint-order="stroke fill">${G(f)}</text>`;
+    `<text x="${x}" y="${y}" data-field="${f}" fill="#ffffff" font-size="16" font-weight="700" font-family="'Courier New',monospace" text-anchor="${anchor}" stroke="#1a1a2e" stroke-width="6" paint-order="stroke fill">${G(f)}</text>`;
   const ln = (x1,y1,x2,y2) => `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/>`;
   const hd = (px,py,dir) => { const S=6; const pts=dir==='U'?`${px-S},${py+S} ${px},${py} ${px+S},${py+S}`:dir==='D'?`${px-S},${py-S} ${px},${py} ${px+S},${py-S}`:dir==='L'?`${px+S},${py-S} ${px},${py} ${px+S},${py+S}`:`${px-S},${py-S} ${px},${py} ${px-S},${py+S}`; return `<polyline points="${pts}" stroke="currentColor" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>`; };
 
