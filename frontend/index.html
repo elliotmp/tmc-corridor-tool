@@ -96,8 +96,8 @@
     background: #fff; color: #111; text-align: center;
     box-shadow: 0 2px 8px rgba(0,0,0,.4);
   }
-  .svgholder text.cls-10 { cursor: pointer; }
-  .svgholder text.cls-10:hover tspan { fill: #3b82f6; }
+  .svgholder text[data-field] { cursor: pointer; }
+  .svgholder text[data-field]:hover { opacity: 0.7; }
 
   /* Ports */
   .port { position: absolute; width: 16px; height: 16px; border-radius: 50%; background: #3b82f6; border: 2px solid #fff; transform: translate(-50%,-50%); opacity: 0; transition: opacity .15s; cursor: crosshair; pointer-events: all; z-index: 20; }
@@ -261,109 +261,62 @@
 // INTERSECTION SVG GENERATOR
 // ════════════════════════════════════════════════
 
-const SVG_DEFS = `<defs><style>
-  .cls-1,.cls-2,.cls-8{fill:none}.cls-1,.cls-2{stroke:#231f20;stroke-miterlimit:10}
-  .cls-1{stroke-linecap:round}.cls-2{stroke-width:2px}.cls-3{fill:#e6e7e8;stroke:#231f20;stroke-miterlimit:10;stroke-width:.75px}
-  .cls-4{fill:#231f20;stroke:#231f20;stroke-miterlimit:10;stroke-linecap:round}
-  .cls-5{fill:#0573b5;stroke:#231f20;stroke-miterlimit:10;stroke-width:1.25px}
-  .cls-6{fill:#ffde17;stroke:#231f20;stroke-miterlimit:10;stroke-width:.25px}
-  .cls-7{fill:#ed1c24;stroke:#231f20;stroke-miterlimit:10;stroke-width:.25px}
-  .cls-8{stroke:#231f20;stroke-miterlimit:10;stroke-width:.5px}
-  .cls-9{fill:#00a14b;stroke:#231f20;stroke-miterlimit:10;stroke-width:.25px}
-  .cls-10{font-family:'Segoe UI',sans-serif;font-size:11.52px;fill:#231f20;font-weight:300}
-  .cls-12{font-size:11px;fill:#662d91;font-family:'Segoe UI',sans-serif;font-style:italic}
-  .cls-13{font-size:10px;fill:#662d91;font-family:'Segoe UI',sans-serif;font-style:italic}
-</style></defs>`;
-
-const SVG_STATIC = `
-  <polygon class="cls-4" points="144.56 122.39 136.75 122.39 140.65 115.63 144.56 122.39"/>
-  <rect class="cls-4" x="139.43" y="122.43" width="2.45" height="8.69"/>
-  <polygon class="cls-4" points="159 123.44 159 115.63 165.76 119.53 159 123.44"/>
-  <rect class="cls-4" x="153.37" y="125.77" width="2.45" height="5.36"/>
-  <path class="cls-1" d="M161.05,120.68c-.15-.02-.32-.03-.51-.03"/>
-  <path class="cls-4" d="M160.54,118.38v2.27c-.42,0-.96.05-1.55.22-.38.11-1.24.38-1.96,1.07-1.34,1.3-1.19,3.21-1.22,3.56h-2.43c-.03-.52-.17-3.34,1.66-5.25.98-1.02,2.17-1.42,2.7-1.58,1.16-.37,2.17-.35,2.8-.29Z"/>
-  <polygon class="cls-4" points="122.31 123.5 122.3 115.69 115.54 119.6 122.31 123.5"/>
-  <rect class="cls-4" x="125.49" y="125.82" width="2.45" height="5.36"/>
-  <path class="cls-1" d="M120.76,120.72c-.19,0-.36,0-.51.03"/>
-  <path class="cls-4" d="M120.76,118.44v2.27c.42,0,.96.05,1.55.22.38.11,1.24.38,1.96,1.07,1.34,1.3,1.19,3.21,1.22,3.56h2.43c.03-.52.17-3.34-1.66-5.25-.98-1.02-2.17-1.42-2.7-1.58-1.16-.37-2.17-.35-2.8-.29Z"/>
-  <polygon class="cls-4" points="120.12 73.65 120.17 81.46 113.38 77.6 120.12 73.65"/>
-  <rect class="cls-4" x="120.19" y="76.29" width="8.69" height="2.45" transform="translate(-.56 .91) rotate(-.42)"/>
-  <polygon class="cls-4" points="121.06 59.2 113.25 59.26 117.1 52.46 121.06 59.2"/>
-  <rect class="cls-4" x="123.42" y="62.34" width="5.36" height="2.45" transform="translate(-.46 .92) rotate(-.42)"/>
-  <path class="cls-1" d="M118.28,57.17c-.02.15-.02.32-.02.51"/>
-  <path class="cls-4" d="M115.99,57.7l2.27-.02c0,.42.06.96.24,1.54.12.38.39,1.24,1.09,1.95,1.31,1.33,3.22,1.16,3.57,1.19l.02,2.43c-.52.04-3.33.2-5.27-1.62-1.03-.97-1.43-2.16-1.6-2.68-.38-1.16-.37-2.17-.31-2.8Z"/>
-  <polygon class="cls-4" points="121.38 95.89 113.57 95.95 117.53 102.68 121.38 95.89"/>
-  <rect class="cls-4" x="123.68" y="90.23" width="5.36" height="2.45" transform="translate(-.71 .98) rotate(-.44)"/>
-  <path class="cls-1" d="M118.61,97.45c0,.19.01.36.03.51"/>
-  <path class="cls-4" d="M116.34,97.47l2.27-.02c0-.42.04-.96.21-1.55.11-.38.37-1.25,1.06-1.97,1.29-1.35,3.2-1.21,3.55-1.25l-.02-2.43c-.52-.03-3.34-.15-5.24,1.7-1.01.98-1.4,2.18-1.56,2.71-.36,1.16-.34,2.17-.27,2.8Z"/>
-  <polygon class="cls-4" points="97.68 147.42 97.64 139.61 104.43 143.48 97.68 147.42"/>
-  <rect class="cls-4" x="88.93" y="142.32" width="8.69" height="2.45" transform="translate(-.73 .48) rotate(-.29)"/>
-  <polygon class="cls-4" points="96.71 161.87 104.52 161.83 100.65 168.61 96.71 161.87"/>
-  <rect class="cls-4" x="89" y="156.27" width="5.36" height="2.45" transform="translate(-.8 .47) rotate(-.29)"/>
-  <path class="cls-1" d="M99.48,163.9c.02-.15.02-.32.02-.51"/>
-  <path class="cls-4" d="M101.77,163.38h-2.27c0-.41-.06-.95-.23-1.53-.11-.38-.39-1.24-1.08-1.96-1.3-1.33-3.21-1.17-3.57-1.2v-2.43c.51-.04,3.32-.19,5.25,1.63,1.02.97,1.43,2.16,1.59,2.69.38,1.16.37,2.17.31,2.8Z"/>
-  <polygon class="cls-4" points="96.46 125.18 104.27 125.13 100.33 118.39 96.46 125.18"/>
-  <rect class="cls-4" x="88.8" y="128.38" width="5.36" height="2.45" transform="translate(-.72 .51) rotate(-.32)"/>
-  <path class="cls-1" d="M99.23,123.62c0-.19-.01-.36-.03-.51"/>
-  <path class="cls-4" d="M101.51,123.61h-2.27c0,.44-.05.97-.22,1.56-.11.38-.37,1.25-1.06,1.97-1.29,1.35-3.2,1.21-3.55,1.24v2.43c.53.03,3.35.15,5.26-1.69,1.01-.98,1.4-2.18,1.57-2.7.37-1.16.34-2.17.28-2.8Z"/>
-  <polygon class="cls-4" points="70.5 99.5 78.31 99.49 74.41 106.26 70.5 99.5"/>
-  <rect class="cls-4" x="73.18" y="90.76" width="2.45" height="8.69"/>
-  <polygon class="cls-4" points="56.06 98.46 56.06 106.27 49.3 102.37 56.06 98.46"/>
-  <rect class="cls-4" x="59.24" y="90.77" width="2.45" height="5.36"/>
-  <path class="cls-1" d="M54.01,101.21c.15.02.32.03.51.03"/>
-  <path class="cls-4" d="M54.52,103.51v-2.27c.42,0,.96-.05,1.55-.23.38-.11,1.24-.38,1.96-1.07,1.34-1.3,1.19-3.21,1.22-3.56h2.43c.03.52.17,3.33-1.66,5.25-.98,1.02-2.17,1.42-2.69,1.58-1.16.37-2.17.36-2.8.3Z"/>
-  <polygon class="cls-4" points="92.75 98.38 92.76 106.19 99.52 102.28 92.75 98.38"/>
-  <rect class="cls-4" x="87.12" y="90.69" width="2.45" height="5.36"/>
-  <path class="cls-1" d="M94.29,101.16c.19,0,.36,0,.51-.03"/>
-  <path class="cls-4" d="M94.3,103.43v-2.27c-.43,0-.96-.05-1.55-.22-.38-.11-1.24-.38-1.96-1.07-1.34-1.29-1.19-3.21-1.22-3.56h-2.43c-.03.52-.17,3.34,1.66,5.25.98,1.02,2.17,1.41,2.7,1.58,1.16.37,2.17.35,2.8.29Z"/>
-  <rect class="cls-2" x="11.44" y="13.46" width="194.65" height="194.65" rx="4" ry="4"/>
-  <line class="cls-8" x1="206.1" y1="110.79" x2="11.44" y2="110.79"/>
-  <line class="cls-8" x1="108.77" y1="13.46" x2="108.77" y2="208.11"/>
-`;
-
-function wrapStreet(text, maxChars) {
-  const words = (text||'').split(' ');
-  const lines = [''];
-  words.forEach(w => {
-    const last = lines[lines.length-1];
-    if (!last) lines[lines.length-1] = w;
-    else if (last.length + 1 + w.length <= maxChars) lines[lines.length-1] += ' ' + w;
-    else lines.push(w);
-  });
-  return lines;
-}
-
 function generateIntersectionSVG(vols, intId, nsStreet, ewStreet) {
-  const v = f => esc(String(vols?.[f] ?? '0'));
-  const t = (tx, field) => `<text class="cls-10" transform="${tx}" data-field="${field}"><tspan x="0" y="0">${v(field)}</tspan></text>`;
+  const G = f => parseInt(vols?.[f] ?? 0);
+  const E = s => String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  const V = (x, y, f, anchor) =>
+    `<text x="${x}" y="${y}" data-field="${f}" fill="currentColor" font-size="10" font-weight="700" font-family="'Courier New',monospace" text-anchor="${anchor}">${G(f)}</text>`;
+  const ln = (x1,y1,x2,y2) => `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/>`;
+  const hd = (px,py,dir) => { const S=6; const pts=dir==='U'?`${px-S},${py+S} ${px},${py} ${px+S},${py+S}`:dir==='D'?`${px-S},${py-S} ${px},${py} ${px+S},${py-S}`:dir==='L'?`${px+S},${py-S} ${px},${py} ${px+S},${py+S}`:`${px-S},${py-S} ${px},${py} ${px-S},${py+S}`; return `<polyline points="${pts}" stroke="currentColor" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>`; };
 
-  // Street name labels with word-wrap
-  const ewLines = wrapStreet(ewStreet, 22);
-  const ewLabel = ewLines.map((l,i) =>
-    `<text class="cls-12" transform="translate(17.29 ${201.98 - (ewLines.length-1-i)*13})"><tspan x="0" y="0">${esc(l)}</tspan></text>`
-  ).join('');
+  const nby=214, nbf=280, nbm=247; // near, far, label-mid y for NB
+  const sby=86,  sbf=20,  sbm=53;  // near, far, label-mid y for SB
+  const ebx=86,  ebf=20,  ebm=53;  // near, far, label-mid x for EB
+  const wbx=214, wbf=280, wbm=247; // near, far, label-mid x for WB
 
-  const nsLines = wrapStreet(nsStreet, 14);
-  const nsLabel = nsLines.map((l,i) =>
-    `<text class="cls-13" transform="translate(${199.4 + i*11} 203.51) rotate(-90)"><tspan x="0" y="0">${esc(l)}</tspan></text>`
-  ).join('');
+  // NS/EW street labels (truncated, in intersection corners)
+  const ewStr = E((ewStreet||'').substring(0,18));
+  const nsStr = E((nsStreet||'').substring(0,14));
 
-  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 220.24 220.24">
-${SVG_DEFS}${SVG_STATIC}
-  ${t('translate(146 158) rotate(-90)','NBT')}
-  ${t('translate(126 158) rotate(-90)','NBL')}
-  ${t('translate(166 158) rotate(-90)','NBR')}
-  ${t('translate(132.16 102)','WBL')}
-  ${t('translate(132.16 82)','WBT')}
-  ${t('translate(132.16 62)','WBR')}
-  ${t('translate(48 130)','EBL')}
-  ${t('translate(48 150)','EBT')}
-  ${t('translate(48 170)','EBR')}
-  ${t('translate(78 86) rotate(-90)','SBT')}
-  ${t('translate(58 86) rotate(-90)','SBR')}
-  ${t('translate(98 86) rotate(-90)','SBL')}
-  ${ewLabel}
-  ${nsLabel}
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 300" style="background:#1a1a2e">
+  <rect x="96" y="96" width="108" height="108" fill="#383850"/>
+  <rect x="150" y="204" width="54" height="96" fill="#2d2d40"/>
+  <rect x="96"  y="0"   width="54" height="96" fill="#2d2d40"/>
+  <rect x="0"   y="150" width="96" height="54" fill="#2d2d40"/>
+  <rect x="204" y="96"  width="96" height="54" fill="#2d2d40"/>
+  <line x1="150" y1="204" x2="150" y2="300" stroke="#4a4a60" stroke-width="1.5"/>
+  <line x1="204" y1="204" x2="204" y2="300" stroke="#4a4a60" stroke-width="1.5"/>
+  <line x1="96"  y1="0"   x2="96"  y2="96"  stroke="#4a4a60" stroke-width="1.5"/>
+  <line x1="150" y1="0"   x2="150" y2="96"  stroke="#4a4a60" stroke-width="1.5"/>
+  <line x1="0"   y1="150" x2="96"  y2="150" stroke="#4a4a60" stroke-width="1.5"/>
+  <line x1="0"   y1="204" x2="96"  y2="204" stroke="#4a4a60" stroke-width="1.5"/>
+  <line x1="204" y1="96"  x2="300" y2="96"  stroke="#4a4a60" stroke-width="1.5"/>
+  <line x1="204" y1="150" x2="300" y2="150" stroke="#4a4a60" stroke-width="1.5"/>
+
+  <g color="#60a5fa">
+    ${ln(159,nbf,159,nby)}${ln(159,nby,138,nby)}${hd(138,nby,'L')}${V(159,nbm+8,'NBL','middle')}
+    ${ln(177,nbf,177,nby)}${hd(177,nby,'U')}${V(177,nbm,'NBT','middle')}
+    ${ln(195,nbf,195,nby)}${ln(195,nby,216,nby)}${hd(216,nby,'R')}${V(195,nbm+8,'NBR','middle')}
+  </g>
+  <g color="#4ade80">
+    ${ln(141,sbf,141,sby)}${ln(141,sby,162,sby)}${hd(162,sby,'R')}${V(141,sbm-8,'SBL','middle')}
+    ${ln(123,sbf,123,sby)}${hd(123,sby,'D')}${V(123,sbm,'SBT','middle')}
+    ${ln(105,sbf,105,sby)}${ln(105,sby,84,sby)}${hd(84,sby,'L')}${V(105,sbm-8,'SBR','middle')}
+  </g>
+  <g color="#fb923c">
+    ${ln(ebf,159,ebx,159)}${ln(ebx,159,ebx,138)}${hd(ebx,138,'U')}${V(ebm,155,'EBL','middle')}
+    ${ln(ebf,177,ebx,177)}${hd(ebx,177,'R')}${V(ebm,173,'EBT','middle')}
+    ${ln(ebf,195,ebx,195)}${ln(ebx,195,ebx,216)}${hd(ebx,216,'D')}${V(ebm,191,'EBR','middle')}
+  </g>
+  <g color="#c084fc">
+    ${ln(wbf,141,wbx,141)}${ln(wbx,141,wbx,162)}${hd(wbx,162,'D')}${V(wbm,137,'WBL','middle')}
+    ${ln(wbf,123,wbx,123)}${hd(wbx,123,'L')}${V(wbm,119,'WBT','middle')}
+    ${ln(wbf,105,wbx,105)}${ln(wbx,105,wbx,84)}${hd(wbx,84,'U')}${V(wbm,101,'WBR','middle')}
+  </g>
+
+  <text x="123" y="183" fill="#6b7280" font-size="8" text-anchor="middle" font-family="system-ui">${ewStr}</text>
+  <text transform="translate(177,117) rotate(-90)" fill="#6b7280" font-size="8" text-anchor="middle" font-family="system-ui">${nsStr}</text>
+  <text x="150" y="155" fill="rgba(255,255,255,0.22)" font-size="13" font-weight="700" text-anchor="middle" font-family="system-ui">${E(String(intId||''))}</text>
 </svg>`;
 }
 
@@ -522,7 +475,7 @@ function attachSvgClickHandlers(cardId) {
   const { el, data } = cards[cardId];
   const svgEl = el.querySelector('.svgholder svg');
   if (!svgEl) return;
-  svgEl.querySelectorAll('text.cls-10[data-field]').forEach(textEl => {
+  svgEl.querySelectorAll('text[data-field]').forEach(textEl => {
     const field = textEl.dataset.field;
     textEl.style.cursor = 'pointer';
     textEl.onclick = e => {
