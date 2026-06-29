@@ -450,6 +450,11 @@ function addCard(data) {
     <div class="port" data-card="${data.id}" data-side="bottom"></div>
     <div class="port" data-card="${data.id}" data-side="left"></div>
   `;
+  el.querySelectorAll('.port').forEach(port => {
+    port.addEventListener('mousedown', e => e.stopPropagation());
+    port.addEventListener('click', e => onPortClick(e, data.id, port.dataset.side, port));
+  });
+
   el.addEventListener('mousedown', e => {
     if (e.target.classList.contains('port') || e.target.classList.contains('card-edit-btn')) return;
     e.preventDefault();
@@ -638,11 +643,9 @@ async function saveEdit() {
 // ════════════════════════════════════════════════
 // PORT / CONNECT  (click port → click port)
 // ════════════════════════════════════════════════
-document.addEventListener('click', e => {
-  const port = e.target.closest('.port');
-  if (!port) return;
+function onPortClick(e, cardId, side, port) {
   e.stopPropagation();
-  const cardId = port.dataset.card, side = port.dataset.side;
+  e.preventDefault();
   if (!connFrom) {
     connFrom = { cardId, side };
     port.classList.add('lit');
@@ -654,7 +657,7 @@ document.addEventListener('click', e => {
     persistConn(connFrom.cardId, connFrom.side, cardId, side, dir);
     cancelConn();
   }
-});
+}
 
 document.addEventListener('keydown', e => { if (e.key === 'Escape') cancelConn(); });
 
