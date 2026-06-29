@@ -785,7 +785,8 @@ const S = 260; // card size in world px
       default: return;
     }
     const dx=x2-x1, dy=y2-y1, len=Math.sqrt(dx*dx+dy*dy)||1;
-    const px=-dy/len*16, py=dx/len*16; // perpendicular offset
+    const OFF = 22;
+    const px=-dy/len*OFF, py=dx/len*OFF; // perpendicular offset
     const mx=(x1+x2)/2, my=(y1+y2)/2;
     const revDir = REVERSE[c.direction];
     const fwd = calcDelta(fc.data, tc.data, c.direction);
@@ -801,7 +802,7 @@ const S = 260; // card size in world px
     l1.setAttribute('stroke-width','5'); l1.setAttribute('stroke-linecap','round');
     g.appendChild(l1);
 
-    // Line 2 — reverse direction (drawn opposite way)
+    // Line 2 — reverse direction
     const l2 = document.createElementNS(ns,'line');
     l2.setAttribute('x1',x2-px); l2.setAttribute('y1',y2-py);
     l2.setAttribute('x2',x1-px); l2.setAttribute('y2',y1-py);
@@ -810,35 +811,40 @@ const S = 260; // card size in world px
     g.appendChild(l2);
 
     // Center divider dash
-    const div = document.createElementNS(ns,'line');
-    div.setAttribute('x1',x1); div.setAttribute('y1',y1);
-    div.setAttribute('x2',x2); div.setAttribute('y2',y2);
-    div.setAttribute('stroke','rgba(255,255,255,0.15)'); div.setAttribute('stroke-width','1.5');
-    div.setAttribute('stroke-dasharray','8,6');
-    g.appendChild(div);
+    const cDiv = document.createElementNS(ns,'line');
+    cDiv.setAttribute('x1',x1); cDiv.setAttribute('y1',y1);
+    cDiv.setAttribute('x2',x2); cDiv.setAttribute('y2',y2);
+    cDiv.setAttribute('stroke','rgba(255,255,255,0.12)'); cDiv.setAttribute('stroke-width','1.5');
+    cDiv.setAttribute('stroke-dasharray','8,6');
+    g.appendChild(cDiv);
 
-    // Badges at 1/3 and 2/3 along line so they never overlap
-    const mkBadge = (delta, dir, bx, by) => {
+    const DIR_ARROW = { eb:'→', wb:'←', nb:'↑', sb:'↓' };
+
+    // Badge centered on its own lane line at midpoint
+    const mkBadge = (delta, dir, lx, ly) => {
       const pct = delta.dep>0 ? Math.abs(delta.dep-delta.arr)/((delta.dep+delta.arr)/2)*100 : 0;
       const ok = pct<=tol;
       const bc = ok ? '#22c55e' : '#ef4444';
-      const label = (ok ? '✓ ' : `Δ${delta.diff} `) + dir.toUpperCase();
+      const arrow = DIR_ARROW[dir] || '';
+      const label = ok ? `${arrow} ✓` : `${arrow} Δ${delta.diff}`;
+      const w = 72, h = 22;
       const r=document.createElementNS(ns,'rect');
-      r.setAttribute('x',bx-34); r.setAttribute('y',by-11);
-      r.setAttribute('width','68'); r.setAttribute('height','20');
-      r.setAttribute('rx','10'); r.setAttribute('fill',bc);
-      r.setAttribute('stroke','#1a1a2e'); r.setAttribute('stroke-width','2');
+      r.setAttribute('x',lx-w/2); r.setAttribute('y',ly-h/2);
+      r.setAttribute('width',w); r.setAttribute('height',h);
+      r.setAttribute('rx','11'); r.setAttribute('fill',bc);
+      r.setAttribute('stroke','#111'); r.setAttribute('stroke-width','1.5');
       g.appendChild(r);
       const t=document.createElementNS(ns,'text');
-      t.setAttribute('x',bx); t.setAttribute('y',by+4);
-      t.setAttribute('text-anchor','middle'); t.setAttribute('font-size','11');
+      t.setAttribute('x',lx); t.setAttribute('y',ly+4);
+      t.setAttribute('text-anchor','middle'); t.setAttribute('font-size','12');
       t.setAttribute('font-weight','700'); t.setAttribute('fill','#fff');
       t.setAttribute('font-family','system-ui,sans-serif');
       t.textContent=label;
       g.appendChild(t);
     };
-    mkBadge(fwd, c.direction, x1+dx/3, y1+dy/3);
-    mkBadge(rev, revDir,      x1+dx*2/3, y1+dy*2/3);
+    // fwd badge on line 1 (offset +), rev badge on line 2 (offset -)
+    mkBadge(fwd, c.direction, mx+px, my+py);
+    mkBadge(rev, revDir,      mx-px, my-py);
 
     svgLayer.appendChild(g);
 
