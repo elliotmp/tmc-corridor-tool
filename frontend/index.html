@@ -212,7 +212,7 @@
 <div id="statusbar">
   <span id="status-zoom">100%</span>
   <span>|</span>
-  <span>Scroll = zoom &nbsp;·&nbsp; Alt+drag = pan &nbsp;·&nbsp; Hover card = ports &nbsp;·&nbsp; ✏️ button = edit volumes</span>
+  <span>Scroll = zoom &nbsp;·&nbsp; Alt+drag = pan &nbsp;·&nbsp; ✏️ = edit volumes</span>
   <span id="status-hint"></span>
 </div>
 
@@ -446,9 +446,9 @@ function addCard(data) {
     <div class="card-label">#${esc(data.int_id)} &mdash; ${esc(data.ns_street)} &amp; ${esc(data.ew_street)}</div>
     <button class="card-edit-btn" title="Edit volumes" onclick="event.stopPropagation();openEdit('${data.id}')">✏</button>
   `;
-  el.addEventListener('click', e => {
+  el.addEventListener('mouseup', e => {
     if (e.target.closest('.card-edit-btn')) return;
-    onCardClickForConnect(data.id);
+    onCardMouseup(data.id);
   });
 
   el.addEventListener('mousedown', e => {
@@ -637,49 +637,62 @@ async function saveEdit() {
 
 
 // ════════════════════════════════════════════════
-// CONNECT MODE  (toolbar button → click card → click card)
+// CONNECT MODE
 // ════════════════════════════════════════════════
 let connectMode = false;
+let pendingDir = null; // direction chosen before picking TO card
 
 function toggleConnectMode() {
   connectMode = !connectMode;
-  connFrom = null;
+  connFrom = null; pendingDir = null;
   const btn = document.getElementById('btn-connect');
   if (connectMode) {
     btn.classList.add('on');
     wrap.classList.add('connecting');
-    setHint('Click the FROM intersection, then the TO intersection — Esc to cancel');
+    setHint('Step 1: click the FROM intersection');
   } else {
     btn.classList.remove('on');
     wrap.classList.remove('connecting');
     setHint('');
+    document.querySelectorAll('.conn-selected').forEach(el => el.classList.remove('conn-selected'));
   }
 }
 
-function onCardClickForConnect(cardId) {
+function showDirPicker() {
+  setHint(`Step 2 — pick the link direction: \
+<button onclick="pickDir('eb')">→ EB</button> \
+<button onclick="pickDir('wb')">← WB</button> \
+<button onclick="pickDir('nb')">↑ NB</button> \
+<button onclick="pickDir('sb')">↓ SB</button> \
+&nbsp; then click the TO intersection`);
+}
+
+function pickDir(dir) {
+  pendingDir = dir;
+  setHint(`Step 3: click the TO intersection (link = <b>${dir.toUpperCase()}</b>) — Esc to cancel`);
+}
+
+function onCardMouseup(cardId) {
   if (!connectMode) return;
   if (!connFrom) {
     connFrom = { cardId };
     document.getElementById('card-' + cardId).classList.add('conn-selected');
-    setHint('Now click the TO intersection — Esc to cancel');
+    showDirPicker();
   } else {
     if (connFrom.cardId === cardId) return;
-    const dir = guessDir(connFrom.cardId, cardId);
-    const fromSide = dir === 'wb' ? 'left' : dir === 'nb' ? 'bottom' : dir === 'sb' ? 'top' : 'right';
-    const toSide   = dir === 'wb' ? 'right' : dir === 'nb' ? 'top' : dir === 'sb' ? 'bottom' : 'left';
+    if (!pendingDir) { toast('Pick a direction first (EB / WB / NB / SB)'); return; }
+    const dir = pendingDir;
+    const fromSide = { eb:'right', wb:'left', nb:'top', sb:'bottom' }[dir];
+    const toSide   = { eb:'left',  wb:'right', nb:'bottom', sb:'top' }[dir];
     persistConn(connFrom.cardId, fromSide, cardId, toSide, dir);
     document.getElementById('card-' + connFrom.cardId)?.classList.remove('conn-selected');
-    connFrom = null;
-    setHint('Click the FROM intersection, then the TO intersection — Esc to cancel');
+    connFrom = null; pendingDir = null;
+    setHint('Step 1: click the FROM intersection');
   }
 }
 
 document.addEventListener('keydown', e => {
-  if (e.key === 'Escape' && connectMode) {
-    document.querySelectorAll('.conn-selected').forEach(el => el.classList.remove('conn-selected'));
-    connFrom = null;
-    toggleConnectMode();
-  }
+  if (e.key === 'Escape' && connectMode) toggleConnectMode();
 });
 
 function guessDir(fromId, toId) {
