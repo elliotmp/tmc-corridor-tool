@@ -240,7 +240,10 @@
 <div id="links-sidebar" style="display:none;position:fixed;right:0;top:48px;bottom:24px;width:300px;background:var(--surface);border-left:1px solid var(--border);overflow-y:auto;z-index:800;padding:12px 14px;box-sizing:border-box;">
   <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
     <strong style="font-size:13px">Links</strong>
-    <button onclick="document.getElementById('links-sidebar').style.display='none'" style="background:none;border:none;color:var(--muted);font-size:18px;cursor:pointer;line-height:1">×</button>
+    <div style="display:flex;gap:6px;align-items:center">
+      <button onclick="clearAllConns()" style="font-size:11px;padding:3px 8px;color:#ef4444;border-color:#ef4444">Clear all</button>
+      <button onclick="document.getElementById('links-sidebar').style.display='none'" style="background:none;border:none;color:var(--muted);font-size:18px;cursor:pointer;line-height:1">×</button>
+    </div>
   </div>
   <div id="links-list"></div>
 </div>
@@ -814,11 +817,21 @@ function calcDelta(fromData, toData, dir) {
   return { dep, arr, diff: Math.abs(dep - arr) };
 }
 
-function renderConn(conn) { redrawConns(); } // sidebar handles all rendering
+const REVERSE = { eb:'wb', wb:'eb', nb:'sb', sb:'nb' };
+
+function renderConn(conn) { redrawConns(); }
 
 async function removeConn(id) {
   await sb.from('connectors').delete().eq('id', id);
   conns = conns.filter(c => c.id !== id);
+  redrawConns();
+}
+
+async function clearAllConns() {
+  if (!project || !conns.length) return;
+  if (!confirm('Delete all links for this project?')) return;
+  await sb.from('connectors').delete().eq('project_id', project.id);
+  conns = [];
   redrawConns();
 }
 
@@ -844,10 +857,8 @@ function redrawConns() {
       default: return;
     }
     const col = DIR_COLOR[c.direction]||'#999';
-    const {dep,arr,diff} = calcDelta(fc.data, tc.data, c.direction);
-    const pct = dep>0 ? Math.abs(dep-arr)/((dep+arr)/2)*100 : 0;
-    const balanced = pct <= tol;
-    const bCol = balanced ? '#22c55e' : pct < tol*3 ? '#f97316' : '#ef4444';
+    const fwd = calcDelta(fc.data, tc.data, c.direction);
+    const rev = calcDelta(tc.data, fc.data, REVERSE[c.direction]);
     const mx=(x1+x2)/2, my=(y1+y2)/2;
 
     const g = document.createElementNS(ns,'g'); g.dataset.cid = c.id;
@@ -858,20 +869,27 @@ function redrawConns() {
     line.setAttribute('stroke-linecap','round'); line.setAttribute('opacity','0.8');
     g.appendChild(line);
 
-    const rect = document.createElementNS(ns,'rect');
-    rect.setAttribute('x',mx-26); rect.setAttribute('y',my-13);
-    rect.setAttribute('width','52'); rect.setAttribute('height','26');
-    rect.setAttribute('rx','13'); rect.setAttribute('fill',bCol);
-    rect.setAttribute('stroke','#1a1a2e'); rect.setAttribute('stroke-width','2');
-    g.appendChild(rect);
-
-    const txt = document.createElementNS(ns,'text');
-    txt.setAttribute('x',mx); txt.setAttribute('y',my+5);
-    txt.setAttribute('text-anchor','middle'); txt.setAttribute('font-size','12');
-    txt.setAttribute('font-weight','700'); txt.setAttribute('fill','#fff');
-    txt.setAttribute('font-family','system-ui,sans-serif');
-    txt.textContent = balanced ? '✓ balanced' : `Δ ${diff}`;
-    g.appendChild(txt);
+    const mkBadge = (delta, dir, offsetY) => {
+      const pct = delta.dep>0 ? Math.abs(delta.dep-delta.arr)/((delta.dep+delta.arr)/2)*100 : 0;
+      const ok = pct <= tol;
+      const bc = ok ? '#22c55e' : pct < tol*3 ? '#f97316' : '#ef4444';
+      const label = (ok ? '✓ ' : `Δ${delta.diff} `) + dir.toUpperCase();
+      const r = document.createElementNS(ns,'rect');
+      r.setAttribute('x',mx-32); r.setAttribute('y',my+offsetY-11);
+      r.setAttribute('width','64'); r.setAttribute('height','20');
+      r.setAttribute('rx','10'); r.setAttribute('fill',bc);
+      r.setAttribute('stroke','#1a1a2e'); r.setAttribute('stroke-width','2');
+      g.appendChild(r);
+      const t = document.createElementNS(ns,'text');
+      t.setAttribute('x',mx); t.setAttribute('y',my+offsetY+4);
+      t.setAttribute('text-anchor','middle'); t.setAttribute('font-size','11');
+      t.setAttribute('font-weight','700'); t.setAttribute('fill','#fff');
+      t.setAttribute('font-family','system-ui,sans-serif');
+      t.textContent = label;
+      g.appendChild(t);
+    };
+    mkBadge(fwd, c.direction, -13);
+    mkBadge(rev, REVERSE[c.direction], 13);
 
     svgLayer.appendChild(g);
   });
