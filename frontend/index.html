@@ -792,13 +792,18 @@ const S = 260; // card size in world px
     const fwd = calcDelta(fc.data, tc.data, c.direction);
     const rev = calcDelta(tc.data, fc.data, revDir);
 
+    const lineColor = (delta) => {
+      const pct = delta.dep>0 ? Math.abs(delta.dep-delta.arr)/((delta.dep+delta.arr)/2)*100 : 0;
+      return (pct<=tol) ? '#22c55e' : '#ef4444';
+    };
+
     const g = document.createElementNS(ns,'g'); g.dataset.cid = c.id;
 
     // Line 1 — primary direction
     const l1 = document.createElementNS(ns,'line');
     l1.setAttribute('x1',x1+px); l1.setAttribute('y1',y1+py);
     l1.setAttribute('x2',x2+px); l1.setAttribute('y2',y2+py);
-    l1.setAttribute('stroke', DIR_COLOR[c.direction]||'#999');
+    l1.setAttribute('stroke', lineColor(fwd));
     l1.setAttribute('stroke-width','5'); l1.setAttribute('stroke-linecap','round');
     g.appendChild(l1);
 
@@ -806,7 +811,7 @@ const S = 260; // card size in world px
     const l2 = document.createElementNS(ns,'line');
     l2.setAttribute('x1',x2-px); l2.setAttribute('y1',y2-py);
     l2.setAttribute('x2',x1-px); l2.setAttribute('y2',y1-py);
-    l2.setAttribute('stroke', DIR_COLOR[revDir]||'#999');
+    l2.setAttribute('stroke', lineColor(rev));
     l2.setAttribute('stroke-width','5'); l2.setAttribute('stroke-linecap','round');
     g.appendChild(l2);
 
@@ -1037,6 +1042,7 @@ function handleIntChange({eventType,new:n,old:o}) {
     cards[n.id].el.style.left=n.x+'px'; cards[n.id].el.style.top=n.y+'px';
     cards[n.id].data={...cards[n.id].data,...n};
     cards[n.id].el.querySelector('.svgholder').innerHTML=svgFor(cards[n.id].data);
+    attachSvgClickHandlers(n.id);
     redrawConns();
   }
   if(eventType==='INSERT'&&!cards[n.id]){ addCard(n); document.getElementById('empty').style.display='none'; }
