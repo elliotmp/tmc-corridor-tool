@@ -949,11 +949,36 @@ async function doUpload() {
   try {
     const rows = parseCSV(await readText(csvFile));
     status.innerHTML = '<span class="spinner"></span> Saving…';
-    const records = rows.map((row,i) => buildRecord(row, i));
+
+    // Wipe old data
+    await sb.from('connectors').delete().eq('project_id', project.id);
     await sb.from('intersections').delete().eq('project_id', project.id);
-    const { error } = await sb.from('intersections').insert(records);
+
+    // Insert intersections laid out in a horizontal line
+    const records = rows.map((row,i) => buildRecord(row, i));
+    const { data: inserted, error } = await sb.from('intersections').insert(records).select();
     if (error) throw new Error(error.message);
-    status.textContent = `✓ Saved ${records.length} intersections.`;
+
+    // Auto-connect consecutive intersections in corridor order
+    const sorted = inserted.sort((a,b) => a.sort_order - b.sort_order);
+    const connRecs = [];
+    for (let i = 0; i < sorted.length - 1; i++) {
+      const from = sorted[i], to = sorted[i+1];
+      // Cards are laid out left→right, so the link direction is EB
+      const dir = 'eb';
+      connRecs.push({
+        project_id: project.id,
+        from_intersection_id: from.id, from_side: 'right',
+        to_intersection_id:   to.id,   to_side:   'left',
+        direction: dir,
+      });
+    }
+    if (connRecs.length) {
+      const { error: ce } = await sb.from('connectors').insert(connRecs);
+      if (ce) console.error('Connector insert error:', ce.message);
+    }
+
+    status.textContent = `✓ Saved ${records.length} intersections, ${connRecs.length} links.`;
     setTimeout(() => { closeUpload(); loadCanvas(); }, 800);
   } catch(err) { status.textContent = '✗ ' + err.message; console.error(err); }
 }
@@ -988,7 +1013,7 @@ function buildRecord(row, idx) {
   return {
     project_id:project.id, int_id:intId, ns_street:ns, ew_street:ew,
     am_volumes:amVols, pm_volumes:pmVols,
-    x:60+(idx%4)*300, y:60+Math.floor(idx/4)*300, sort_order:idx,
+    x:60+(idx*300), y:120, sort_order:idx,
   };
 }
 
