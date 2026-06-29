@@ -698,17 +698,25 @@ document.addEventListener('mousemove', e => {
 
 document.addEventListener('mouseup', e => {
   if (!connFrom) return;
-  const {x,y} = toWorld(e.clientX, e.clientY);
-  const targetId = cardAtWorld(x, y, connFrom.cardId);
-  if (targetId) {
-    const dir = guessDir(connFrom.cardId, targetId);
-    const fromSide = connFrom.side;
-    const toSide = { top:'bottom', bottom:'top', left:'right', right:'left' }[fromSide];
-    persistConn(connFrom.cardId, fromSide, targetId, toSide, dir);
-  }
+  // Use browser hit-test to find which card we dropped onto
+  const fromId = connFrom.cardId;
+  const savedFrom = connFrom;
+  // Clean up drag state first
   document.querySelectorAll('.port.lit, .card.conn-hover').forEach(el=>{ el.classList.remove('lit'); el.classList.remove('conn-hover'); });
   if (dragLine) { dragLine.remove(); dragLine=null; }
   connFrom = null;
+
+  const el = document.elementFromPoint(e.clientX, e.clientY);
+  const targetCard = el?.closest('.card');
+  if (!targetCard) return;
+  const targetId = targetCard.id.replace('card-', '');
+  if (targetId === fromId) return;
+
+  // Direction based on relative card positions
+  const dir = guessDir(fromId, targetId);
+  const sides = { eb:{from:'right',to:'left'}, wb:{from:'left',to:'right'}, nb:{from:'top',to:'bottom'}, sb:{from:'bottom',to:'top'} };
+  const {from: fromSide, to: toSide} = sides[dir];
+  persistConn(fromId, fromSide, targetId, toSide, dir);
 });
 
 document.addEventListener('keydown', e => { if (e.key==='Escape' && connFrom) {
