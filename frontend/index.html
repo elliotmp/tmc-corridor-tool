@@ -100,10 +100,9 @@
   .svgholder text.cls-10:hover tspan { fill: #3b82f6; }
 
   /* Ports */
-  .port { position: absolute; width: 13px; height: 13px; border-radius: 50%; background: #3b82f6; border: 2px solid white; transform: translate(-50%,-50%); opacity: 0; transition: opacity .12s; cursor: crosshair; pointer-events: all; z-index: 10; }
+  .port { position: absolute; width: 18px; height: 18px; border-radius: 50%; background: #3b82f6; border: 3px solid white; transform: translate(-50%,-50%); opacity: 0; transition: opacity .15s; cursor: crosshair; pointer-events: all; z-index: 10; box-shadow: 0 0 0 2px #3b82f6; }
   .card:hover .port { opacity: 1; }
-  .port.lit { opacity: 1 !important; background: #22c55e; }
-  .port.target-lit { opacity: 1 !important; background: #f97316; }
+  .port.lit { opacity: 1 !important; background: #22c55e; box-shadow: 0 0 0 3px #22c55e; }
   .port[data-side=top]    { top: 0;    left: 50%; }
   .port[data-side=right]  { top: 50%;  left: 100%; }
   .port[data-side=bottom] { top: 100%; left: 50%; }
@@ -637,71 +636,30 @@ async function saveEdit() {
 
 
 // ════════════════════════════════════════════════
-// PORT / CONNECT  (drag to connect)
+// PORT / CONNECT  (click port → click port)
 // ════════════════════════════════════════════════
-let dragLine = null; // live preview SVG line
-
-function portCenter(port) {
-  const r = port.getBoundingClientRect();
-  return { x: r.left + r.width/2, y: r.top + r.height/2 };
-}
-
-function nearestPort(x, y, excludeCardId) {
-  let best = null, bestDist = Infinity;
-  document.querySelectorAll('.port').forEach(p => {
-    if (p.dataset.card === excludeCardId) return;
-    const c = portCenter(p);
-    const d = Math.hypot(c.x - x, c.y - y);
-    if (d < bestDist) { bestDist = d; best = p; }
-  });
-  return bestDist < 40 ? best : null;
-}
-
-document.addEventListener('mousedown', e => {
+document.addEventListener('click', e => {
   const port = e.target.closest('.port');
   if (!port) return;
-  e.stopPropagation(); e.preventDefault();
-  connFrom = { cardId: port.dataset.card, side: port.dataset.side };
-  port.classList.add('lit');
-  wrap.classList.add('connecting');
-  setHint('Drag to another card\'s port — Esc to cancel');
-
-  // Create preview line on the SVG layer
-  dragLine = document.createElementNS('http://www.w3.org/2000/svg','line');
-  dragLine.setAttribute('stroke','#94a3b8'); dragLine.setAttribute('stroke-width','2');
-  dragLine.setAttribute('stroke-dasharray','6,4'); dragLine.setAttribute('pointer-events','none');
-  const c = portCenter(port);
-  dragLine.setAttribute('x1', c.x); dragLine.setAttribute('y1', c.y);
-  dragLine.setAttribute('x2', c.x); dragLine.setAttribute('y2', c.y);
-  svgLayer.appendChild(dragLine);
-}, true);
-
-document.addEventListener('mousemove', e => {
-  if (!connFrom || !dragLine) return;
-  dragLine.setAttribute('x2', e.clientX); dragLine.setAttribute('y2', e.clientY);
-  // Highlight nearest port
-  document.querySelectorAll('.port.target-lit').forEach(p => p.classList.remove('target-lit'));
-  const near = nearestPort(e.clientX, e.clientY, connFrom.cardId);
-  if (near) near.classList.add('target-lit');
-});
-
-document.addEventListener('mouseup', e => {
-  if (!connFrom) return;
-  const near = nearestPort(e.clientX, e.clientY, connFrom.cardId);
-  if (near && near.dataset.card !== connFrom.cardId) {
-    const dir = guessDir(connFrom.cardId, near.dataset.card);
-    persistConn(connFrom.cardId, connFrom.side, near.dataset.card, near.dataset.side, dir);
+  e.stopPropagation();
+  const cardId = port.dataset.card, side = port.dataset.side;
+  if (!connFrom) {
+    connFrom = { cardId, side };
+    port.classList.add('lit');
+    wrap.classList.add('connecting');
+    setHint('Now click a port on another card to connect — Esc to cancel');
+  } else {
+    if (connFrom.cardId === cardId) { cancelConn(); return; }
+    const dir = guessDir(connFrom.cardId, cardId);
+    persistConn(connFrom.cardId, connFrom.side, cardId, side, dir);
+    cancelConn();
   }
-  cancelConn();
 });
 
 document.addEventListener('keydown', e => { if (e.key === 'Escape') cancelConn(); });
 
 function cancelConn() {
-  document.querySelectorAll('.port.lit, .port.target-lit').forEach(p => {
-    p.classList.remove('lit'); p.classList.remove('target-lit');
-  });
-  if (dragLine) { dragLine.remove(); dragLine = null; }
+  document.querySelectorAll('.port.lit').forEach(p => p.classList.remove('lit'));
   connFrom = null; wrap.classList.remove('connecting'); setHint('');
 }
 
@@ -949,36 +907,12 @@ async function doUpload() {
   try {
     const rows = parseCSV(await readText(csvFile));
     status.innerHTML = '<span class="spinner"></span> Saving…';
-
-    // Wipe old data
     await sb.from('connectors').delete().eq('project_id', project.id);
     await sb.from('intersections').delete().eq('project_id', project.id);
-
-    // Insert intersections laid out in a horizontal line
     const records = rows.map((row,i) => buildRecord(row, i));
-    const { data: inserted, error } = await sb.from('intersections').insert(records).select();
+    const { error } = await sb.from('intersections').insert(records);
     if (error) throw new Error(error.message);
-
-    // Auto-connect consecutive intersections in corridor order
-    const sorted = inserted.sort((a,b) => a.sort_order - b.sort_order);
-    const connRecs = [];
-    for (let i = 0; i < sorted.length - 1; i++) {
-      const from = sorted[i], to = sorted[i+1];
-      // Cards are laid out left→right, so the link direction is EB
-      const dir = 'eb';
-      connRecs.push({
-        project_id: project.id,
-        from_intersection_id: from.id, from_side: 'right',
-        to_intersection_id:   to.id,   to_side:   'left',
-        direction: dir,
-      });
-    }
-    if (connRecs.length) {
-      const { error: ce } = await sb.from('connectors').insert(connRecs);
-      if (ce) console.error('Connector insert error:', ce.message);
-    }
-
-    status.textContent = `✓ Saved ${records.length} intersections, ${connRecs.length} links.`;
+    status.textContent = `✓ Saved ${records.length} intersections.`;
     setTimeout(() => { closeUpload(); loadCanvas(); }, 800);
   } catch(err) { status.textContent = '✗ ' + err.message; console.error(err); }
 }
