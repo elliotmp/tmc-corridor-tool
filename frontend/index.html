@@ -100,8 +100,10 @@
   .svgholder text.cls-10:hover tspan { fill: #3b82f6; }
 
   /* Ports */
-  .conn-selected { outline: 3px solid #22c55e !important; box-shadow: 0 0 0 6px rgba(34,197,94,.25) !important; }
-  #canvas-wrap.connecting .card { cursor: crosshair; }
+  .port { position: absolute; width: 16px; height: 16px; border-radius: 50%; background: #3b82f6; border: 2px solid #fff; transform: translate(-50%,-50%); opacity: 0; transition: opacity .15s; cursor: crosshair; pointer-events: all; z-index: 20; }
+  .card:hover .port { opacity: 1; }
+  .port.lit { opacity: 1 !important; background: #22c55e; }
+  .port.snap-lit { opacity: 1 !important; background: #f97316; }
   .port[data-side=top]    { top: 0;    left: 50%; }
   .port[data-side=right]  { top: 50%;  left: 100%; }
   .port[data-side=bottom] { top: 100%; left: 50%; }
@@ -187,7 +189,6 @@
     Tolerance <input type="number" id="tol-input" value="5" min="0" max="50" step="1" title="Balance tolerance %" /> %
   </div>
   <div class="sep"></div>
-  <button id="btn-connect" onclick="toggleConnectMode()">Connect</button>
   <button onclick="autoArrange()">Auto Arrange</button>
   <button onclick="fitView()">Fit</button>
   <button class="btn-accent" onclick="exportCSV()">Export CSV</button>
@@ -445,14 +446,15 @@ function addCard(data) {
     <div class="card-inner"><div class="svgholder">${svgFor(data)}</div></div>
     <div class="card-label">#${esc(data.int_id)} &mdash; ${esc(data.ns_street)} &amp; ${esc(data.ew_street)}</div>
     <button class="card-edit-btn" title="Edit volumes" onclick="event.stopPropagation();openEdit('${data.id}')">✏</button>
+    <div class="port" data-card="${data.id}" data-side="top"></div>
+    <div class="port" data-card="${data.id}" data-side="right"></div>
+    <div class="port" data-card="${data.id}" data-side="bottom"></div>
+    <div class="port" data-card="${data.id}" data-side="left"></div>
   `;
-  el.addEventListener('mouseup', e => {
-    if (e.target.closest('.card-edit-btn')) return;
-    onCardMouseup(data.id);
-  });
 
   el.addEventListener('mousedown', e => {
-    if (e.target.classList.contains('card-edit-btn')) return;
+    if (e.target.classList.contains('port')) { startConnDrag(e, data.id, e.target.dataset.side); return; }
+    if (e.target.closest('.card-edit-btn')) return;
     e.preventDefault();
     dragging = { id: data.id, sx: e.clientX, sy: e.clientY, cx: parseFloat(el.style.left), cy: parseFloat(el.style.top) };
   });
@@ -637,63 +639,83 @@ async function saveEdit() {
 
 
 // ════════════════════════════════════════════════
-// CONNECT MODE
+// DRAG-TO-CONNECT
 // ════════════════════════════════════════════════
-let connectMode = false;
-let pendingDir = null; // direction chosen before picking TO card
+let dragLine = null;
 
-function toggleConnectMode() {
-  connectMode = !connectMode;
-  connFrom = null; pendingDir = null;
-  const btn = document.getElementById('btn-connect');
-  if (connectMode) {
-    btn.classList.add('on');
-    wrap.classList.add('connecting');
-    setHint('Step 1: click the FROM intersection');
-  } else {
-    btn.classList.remove('on');
-    wrap.classList.remove('connecting');
-    setHint('');
-    document.querySelectorAll('.conn-selected').forEach(el => el.classList.remove('conn-selected'));
+// Convert screen coords → world (SVG) coords
+function toWorld(clientX, clientY) {
+  const r = wrap.getBoundingClientRect();
+  return { x: (clientX - r.left - tx) / scale, y: (clientY - r.top - ty) / scale };
+}
+
+// World position of a port on a card
+function portWorldPos(cardId, side) {
+  const el = cards[cardId]?.el;
+  if (!el) return null;
+  const x = parseFloat(el.style.left), y = parseFloat(el.style.top);
+  const w = el.offsetWidth,            h = el.offsetHeight;
+  return { top:{x:x+w/2,y}, right:{x:x+w,y:y+h/2}, bottom:{x:x+w/2,y:y+h}, left:{x,y:y+h/2} }[side];
+}
+
+// Find closest port on any other card within snap distance (world px)
+function snapPort(wx, wy, excludeCardId, snapDist=30) {
+  let best = null, bestD = Infinity;
+  for (const [id, {el}] of Object.entries(cards)) {
+    if (id === excludeCardId) continue;
+    for (const side of ['top','right','bottom','left']) {
+      const p = portWorldPos(id, side); if (!p) continue;
+      const d = Math.hypot(p.x-wx, p.y-wy);
+      if (d < snapDist && d < bestD) { bestD=d; best={cardId:id, side, ...p}; }
+    }
   }
+  return best;
 }
 
-function showDirPicker() {
-  setHint(`Step 2 — pick the link direction: \
-<button onclick="pickDir('eb')">→ EB</button> \
-<button onclick="pickDir('wb')">← WB</button> \
-<button onclick="pickDir('nb')">↑ NB</button> \
-<button onclick="pickDir('sb')">↓ SB</button> \
-&nbsp; then click the TO intersection`);
+function startConnDrag(e, cardId, side) {
+  e.stopPropagation(); e.preventDefault();
+  connFrom = { cardId, side };
+  const p = portWorldPos(cardId, side);
+  dragLine = document.createElementNS('http://www.w3.org/2000/svg','line');
+  dragLine.setAttribute('stroke','#94a3b8');
+  dragLine.setAttribute('stroke-width','2');
+  dragLine.setAttribute('stroke-dasharray','6,3');
+  dragLine.setAttribute('pointer-events','none');
+  dragLine.setAttribute('x1', p.x); dragLine.setAttribute('y1', p.y);
+  dragLine.setAttribute('x2', p.x); dragLine.setAttribute('y2', p.y);
+  svgLayer.appendChild(dragLine);
+  document.getElementById('card-'+cardId)?.querySelectorAll('.port').forEach(p=>{ if(p.dataset.side===side) p.classList.add('lit'); });
 }
 
-function pickDir(dir) {
-  pendingDir = dir;
-  setHint(`Step 3: click the TO intersection (link = <b>${dir.toUpperCase()}</b>) — Esc to cancel`);
-}
-
-function onCardMouseup(cardId) {
-  if (!connectMode) return;
-  if (!connFrom) {
-    connFrom = { cardId };
-    document.getElementById('card-' + cardId).classList.add('conn-selected');
-    showDirPicker();
-  } else {
-    if (connFrom.cardId === cardId) return;
-    if (!pendingDir) { toast('Pick a direction first (EB / WB / NB / SB)'); return; }
-    const dir = pendingDir;
-    const fromSide = { eb:'right', wb:'left', nb:'top', sb:'bottom' }[dir];
-    const toSide   = { eb:'left',  wb:'right', nb:'bottom', sb:'top' }[dir];
-    persistConn(connFrom.cardId, fromSide, cardId, toSide, dir);
-    document.getElementById('card-' + connFrom.cardId)?.classList.remove('conn-selected');
-    connFrom = null; pendingDir = null;
-    setHint('Step 1: click the FROM intersection');
+document.addEventListener('mousemove', e => {
+  if (!connFrom || !dragLine) return;
+  const {x,y} = toWorld(e.clientX, e.clientY);
+  const snap = snapPort(x, y, connFrom.cardId);
+  dragLine.setAttribute('x2', snap ? snap.x : x);
+  dragLine.setAttribute('y2', snap ? snap.y : y);
+  document.querySelectorAll('.port.snap-lit').forEach(p=>p.classList.remove('snap-lit'));
+  if (snap) {
+    cards[snap.cardId]?.el.querySelectorAll('.port').forEach(p=>{ if(p.dataset.side===snap.side) p.classList.add('snap-lit'); });
   }
-}
-
-document.addEventListener('keydown', e => {
-  if (e.key === 'Escape' && connectMode) toggleConnectMode();
 });
+
+document.addEventListener('mouseup', e => {
+  if (!connFrom) return;
+  const {x,y} = toWorld(e.clientX, e.clientY);
+  const snap = snapPort(x, y, connFrom.cardId);
+  if (snap) {
+    const dir = guessDir(connFrom.cardId, snap.cardId);
+    persistConn(connFrom.cardId, connFrom.side, snap.cardId, snap.side, dir);
+  }
+  document.querySelectorAll('.port.lit, .port.snap-lit').forEach(p=>{ p.classList.remove('lit'); p.classList.remove('snap-lit'); });
+  if (dragLine) { dragLine.remove(); dragLine=null; }
+  connFrom = null;
+});
+
+document.addEventListener('keydown', e => { if (e.key==='Escape' && connFrom) {
+  document.querySelectorAll('.port.lit,.port.snap-lit').forEach(p=>{p.classList.remove('lit');p.classList.remove('snap-lit');});
+  if (dragLine){dragLine.remove();dragLine=null;} connFrom=null;
+}});
 
 function guessDir(fromId, toId) {
   const from = cards[fromId], to = cards[toId];
