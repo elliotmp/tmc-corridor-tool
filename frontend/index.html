@@ -112,10 +112,13 @@
   .port[data-side=bottom] { top: 100%; left: 50%; }
   .port[data-side=left]   { top: 50%;  left: 0; }
 
-  /* ── Connectors ── */
-  .conn-path { fill: none; stroke-width: 6; stroke-linecap: round; stroke-linejoin: round; }
-  .conn-hit  { fill: none; stroke: transparent; stroke-width: 22; cursor: pointer; pointer-events: stroke; }
-  .conn-del { position: absolute; width: 18px; height: 18px; border-radius: 50%; background: #ef4444; border: 2px solid white; color: white; font-size: 12px; font-weight: 700; display: flex; align-items: center; justify-content: center; cursor: pointer; transform: translate(-50%,-50%); pointer-events: all; }
+  /* ── Links sidebar ── */
+  .link-row { padding: 8px 0; border-bottom: 1px solid var(--border); font-size: 12px; }
+  .link-names { margin-bottom: 4px; line-height: 1.4; }
+  .link-stats { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+  .link-stats span { color: var(--muted); }
+  .link-badge { padding: 2px 8px; border-radius: 12px; color: #fff; font-weight: 700; font-size: 11px; }
+  .link-del { margin-left: auto; background: none; border: none; color: #ef4444; font-size: 16px; cursor: pointer; line-height: 1; padding: 0 2px; }
 
   /* ── Empty state ── */
   #empty { position: absolute; inset: 0; display: none; flex-direction: column; align-items: center; justify-content: center; gap: 12px; color: var(--muted); pointer-events: none; }
@@ -231,6 +234,15 @@
     <p>Upload a CSV to populate this project's intersections.</p>
   </div>
   <div id="del-btns" style="position:absolute;top:0;left:0;pointer-events:none"></div>
+</div>
+
+<!-- Links sidebar -->
+<div id="links-sidebar" style="display:none;position:fixed;right:0;top:48px;bottom:24px;width:300px;background:var(--surface);border-left:1px solid var(--border);overflow-y:auto;z-index:800;padding:12px 14px;box-sizing:border-box;">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+    <strong style="font-size:13px">Links</strong>
+    <button onclick="document.getElementById('links-sidebar').style.display='none'" style="background:none;border:none;color:var(--muted);font-size:18px;cursor:pointer;line-height:1">×</button>
+  </div>
+  <div id="links-list"></div>
 </div>
 
 <!-- Status bar -->
@@ -453,8 +465,8 @@ async function loadCanvas() {
 function clearCanvas() {
   Object.values(cards).forEach(c => c.el.remove());
   cards = {}; conns = [];
-  svgLayer.innerHTML = ''; delBtns.innerHTML = '';
-  addDefs();
+  svgLayer.innerHTML = '';
+  redrawConns();
 }
 
 // ════════════════════════════════════════════════
@@ -703,6 +715,7 @@ async function doLink() {
   const {from: fromSide, to: toSide} = sides[linkDir];
   closeLinkPanel();
   await persistConn(fromId, fromSide, toId, toSide, linkDir);
+  document.getElementById('links-sidebar').style.display = 'block';
 }
 
 // ════════════════════════════════════════════════
@@ -816,115 +829,45 @@ async function persistConn(fromId, fromSide, toId, toSide, dir) {
 const DIR_COLOR = { eb: '#3b82f6', wb: '#ef4444', nb: '#22c55e', sb: '#a855f7' };
 const THRU_KEY  = { eb: 'EBT', wb: 'WBT', nb: 'NBT', sb: 'SBT' };
 
-function addDefs() {
-  const defs = document.createElementNS('http://www.w3.org/2000/svg','defs');
-  ['eb','wb','nb','sb'].forEach(dir => {
-    const m = document.createElementNS('http://www.w3.org/2000/svg','marker');
-    m.setAttribute('id',`arr-${dir}`); m.setAttribute('markerWidth','7'); m.setAttribute('markerHeight','7');
-    m.setAttribute('refX','5'); m.setAttribute('refY','3'); m.setAttribute('orient','auto');
-    const p = document.createElementNS('http://www.w3.org/2000/svg','path');
-    p.setAttribute('d','M0,0 L0,6 L7,3 z'); p.setAttribute('fill', DIR_COLOR[dir]);
-    m.appendChild(p); defs.appendChild(m);
-  });
-  svgLayer.appendChild(defs);
-}
-
-function portPos(cardId, side) {
-  const c = cards[cardId]; if (!c) return { x:0,y:0 };
-  const x = parseFloat(c.el.style.left), y = parseFloat(c.el.style.top), S = 260;
-  if (side==='top')    return { x: x+S/2, y };
-  if (side==='bottom') return { x: x+S/2, y: y+S };
-  if (side==='left')   return { x, y: y+S/2 };
-  if (side==='right')  return { x: x+S, y: y+S/2 };
-  return { x, y };
-}
-
-function elbowPath(p1, s1, p2) {
-  const hori = s => s==='left'||s==='right';
-  if (hori(s1)) { const mx=(p1.x+p2.x)/2; return `M${p1.x},${p1.y} C${mx},${p1.y} ${mx},${p2.y} ${p2.x},${p2.y}`; }
-  const my=(p1.y+p2.y)/2; return `M${p1.x},${p1.y} C${p1.x},${my} ${p2.x},${my} ${p2.x},${p2.y}`;
-}
-
 function calcDelta(fromData, toData, dir) {
-  const key = THRU_KEY[dir]; if (!key||!fromData||!toData) return null;
-  const vols = d => scenario==='pm' ? d.pm_volumes : d.am_volumes;
-  const a = parseFloat(vols(fromData)?.[key]??0), b = parseFloat(vols(toData)?.[key]??0);
-  const avg = (a+b)/2; if (avg===0) return 0;
-  return (Math.abs(a-b)/avg)*100;
+  const dep = linkDeparture(getVols(fromData), dir);
+  const arr = linkArrival(getVols(toData), dir);
+  return { dep, arr, diff: Math.abs(dep - arr) };
 }
 
-function renderConn(conn) {
-  const p1 = portPos(conn.from_intersection_id, conn.from_side);
-  const p2 = portPos(conn.to_intersection_id,   conn.to_side);
-  const color = DIR_COLOR[conn.direction]||'#999';
-  const d = elbowPath(p1, conn.from_side, p2);
-  const g = document.createElementNS('http://www.w3.org/2000/svg','g');
-  g.dataset.cid = conn.id;
-
-  const hit = document.createElementNS('http://www.w3.org/2000/svg','path');
-  hit.setAttribute('d',d); hit.classList.add('conn-hit');
-  const path = document.createElementNS('http://www.w3.org/2000/svg','path');
-  path.setAttribute('d',d); path.classList.add('conn-path');
-  path.setAttribute('stroke',color); path.setAttribute('marker-end',`url(#arr-${conn.direction})`);
-  g.appendChild(hit); g.appendChild(path);
-
-  // Delta badge
-  const fromData = cards[conn.from_intersection_id]?.data;
-  const toData   = cards[conn.to_intersection_id]?.data;
-  const delta = calcDelta(fromData, toData, conn.direction);
-  const tol   = getTolerance();
-  const mx = (p1.x+p2.x)/2, my = (p1.y+p2.y)/2;
-
-  if (delta !== null) {
-    const dep = linkDeparture(getVols(fromData), conn.direction);
-    const arr = linkArrival(getVols(toData), conn.direction);
-    const diff = Math.abs(dep - arr);
-    const balanced = delta <= tol;
-    const badgeColor = balanced ? '#22c55e' : delta < tol*3 ? '#f97316' : '#ef4444';
-    const fo = document.createElementNS('http://www.w3.org/2000/svg','foreignObject');
-    fo.setAttribute('x', mx-36); fo.setAttribute('y', my-18);
-    fo.setAttribute('width','72'); fo.setAttribute('height','36');
-    const div = document.createElement('div');
-    div.style.cssText = `background:${badgeColor};color:#fff;border-radius:20px;font-size:13px;font-weight:700;text-align:center;line-height:36px;border:2px solid #fff;box-shadow:0 1px 5px rgba(0,0,0,.4);font-family:system-ui,sans-serif;width:72px;height:36px;box-sizing:border-box;overflow:visible;`;
-    div.textContent = balanced ? '✓' : `Δ${diff}`;
-    fo.appendChild(div); g.appendChild(fo);
-  }
-
-  svgLayer.appendChild(g);
-
-  // Delete button
-  const btn = document.createElement('div');
-  btn.className = 'conn-del'; btn.dataset.cid = conn.id;
-  btn.textContent = '×'; btn.style.pointerEvents = 'all';
-  btn.onclick = e => { e.stopPropagation(); removeConn(conn.id); };
-  delBtns.appendChild(btn);
-  placeDelBtn(btn, mx, my-20);
-}
-
-function placeDelBtn(btn, wx, wy) {
-  btn.style.left = (wx*scale+tx)+'px'; btn.style.top = (wy*scale+ty)+'px';
-}
-
-function syncDelBtns() {
-  conns.forEach(c => {
-    const btn = delBtns.querySelector(`[data-cid="${c.id}"]`); if(!btn) return;
-    const p1 = portPos(c.from_intersection_id, c.from_side);
-    const p2 = portPos(c.to_intersection_id,   c.to_side);
-    placeDelBtn(btn, (p1.x+p2.x)/2, (p1.y+p2.y)/2 - 20);
-  });
-}
+function renderConn(conn) { redrawConns(); } // sidebar handles all rendering
 
 async function removeConn(id) {
-  await sb.from('connectors').delete().eq('id',id);
-  conns = conns.filter(c=>c.id!==id);
-  svgLayer.querySelector(`[data-cid="${id}"]`)?.remove();
-  delBtns.querySelector(`[data-cid="${id}"]`)?.remove();
+  await sb.from('connectors').delete().eq('id', id);
+  conns = conns.filter(c => c.id !== id);
+  redrawConns();
 }
 
 function redrawConns() {
-  svgLayer.querySelectorAll('g[data-cid]').forEach(g=>g.remove());
-  delBtns.innerHTML = '';
-  conns.forEach(renderConn);
+  const tol = getTolerance();
+  const dirLabel = { eb:'→ EB', wb:'← WB', nb:'↑ NB', sb:'↓ SB' };
+  const sidebar = document.getElementById('links-list');
+  if (!sidebar) return;
+  if (!conns.length) { sidebar.innerHTML = '<div style="color:var(--muted);font-size:12px;padding:8px 0">No links yet. Use + Link to connect intersections.</div>'; return; }
+  sidebar.innerHTML = conns.map(c => {
+    const fromData = cards[c.from_intersection_id]?.data;
+    const toData   = cards[c.to_intersection_id]?.data;
+    if (!fromData || !toData) return '';
+    const {dep, arr, diff} = calcDelta(fromData, toData, c.direction);
+    const pct = dep > 0 ? Math.round(Math.abs(dep-arr)/((dep+arr)/2)*100) : 0;
+    const balanced = pct <= tol;
+    const color = balanced ? '#22c55e' : pct < tol*3 ? '#f97316' : '#ef4444';
+    const fromLabel = `#${fromData.int_id} ${fromData.ew_street}`;
+    const toLabel   = `#${toData.int_id} ${toData.ew_street}`;
+    return `<div class="link-row" data-cid="${c.id}">
+      <div class="link-names">${esc(fromLabel)} <span style="color:${DIR_COLOR[c.direction]}">${dirLabel[c.direction]||c.direction}</span> ${esc(toLabel)}</div>
+      <div class="link-stats">
+        <span>Dep: ${dep}</span><span>Arr: ${arr}</span>
+        <span class="link-badge" style="background:${color}">${balanced ? '✓' : 'Δ'+diff}</span>
+        <button class="link-del" onclick="removeConn('${c.id}')">×</button>
+      </div>
+    </div>`;
+  }).join('');
 }
 
 // ════════════════════════════════════════════════
@@ -950,7 +893,7 @@ document.addEventListener('mousemove', e => {
   if (dragging) {
     const dx=(e.clientX-dragging.sx)/scale, dy=(e.clientY-dragging.sy)/scale;
     const el=cards[dragging.id]?.el; if(el){el.style.left=(dragging.cx+dx)+'px';el.style.top=(dragging.cy+dy)+'px';}
-    redrawConns(); syncDelBtns();
+    redrawConns(); redrawConns();
   }
 });
 
@@ -967,7 +910,7 @@ document.addEventListener('mouseup', async e => {
 function applyTransform() {
   world.style.transform=`translate(${tx}px,${ty}px) scale(${scale})`;
   document.getElementById('status-zoom').textContent=Math.round(scale*100)+'%';
-  syncDelBtns();
+  redrawConns();
 }
 
 function autoArrange() {
@@ -978,7 +921,7 @@ function autoArrange() {
     cards[id].data.x=x; cards[id].data.y=y;
     sb.from('intersections').update({x,y}).eq('id',id);
   });
-  redrawConns(); syncDelBtns(); fitView();
+  redrawConns(); redrawConns(); fitView();
 }
 
 function fitView() {
@@ -1098,14 +1041,14 @@ function handleIntChange({eventType,new:n,old:o}) {
     cards[n.id].el.style.left=n.x+'px'; cards[n.id].el.style.top=n.y+'px';
     cards[n.id].data={...cards[n.id].data,...n};
     cards[n.id].el.querySelector('.svgholder').innerHTML=svgFor(cards[n.id].data);
-    redrawConns(); syncDelBtns();
+    redrawConns();
   }
   if(eventType==='INSERT'&&!cards[n.id]){ addCard(n); document.getElementById('empty').style.display='none'; }
   if(eventType==='DELETE'){ cards[o.id]?.el.remove(); delete cards[o.id]; redrawConns(); }
 }
 function handleConnChange({eventType,new:n,old:o}) {
-  if(eventType==='INSERT'&&!conns.find(c=>c.id===n.id)){ conns.push(n); renderConn(n); }
-  if(eventType==='DELETE'){ conns=conns.filter(c=>c.id!==o.id); svgLayer.querySelector(`[data-cid="${o.id}"]`)?.remove(); delBtns.querySelector(`[data-cid="${o.id}"]`)?.remove(); }
+  if(eventType==='INSERT'&&!conns.find(c=>c.id===n.id)){ conns.push(n); redrawConns(); }
+  if(eventType==='DELETE'){ conns=conns.filter(c=>c.id!==o.id); redrawConns(); }
 }
 
 // ════════════════════════════════════════════════
