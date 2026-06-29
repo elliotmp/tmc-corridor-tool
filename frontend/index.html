@@ -100,9 +100,8 @@
   .svgholder text.cls-10:hover tspan { fill: #3b82f6; }
 
   /* Ports */
-  .port { position: absolute; width: 18px; height: 18px; border-radius: 50%; background: #3b82f6; border: 3px solid white; transform: translate(-50%,-50%); opacity: 0; transition: opacity .15s; cursor: crosshair; pointer-events: all; z-index: 10; box-shadow: 0 0 0 2px #3b82f6; }
-  .card:hover .port { opacity: 1; }
-  .port.lit { opacity: 1 !important; background: #22c55e; box-shadow: 0 0 0 3px #22c55e; }
+  .conn-selected { outline: 3px solid #22c55e !important; box-shadow: 0 0 0 6px rgba(34,197,94,.25) !important; }
+  #canvas-wrap.connecting .card { cursor: crosshair; }
   .port[data-side=top]    { top: 0;    left: 50%; }
   .port[data-side=right]  { top: 50%;  left: 100%; }
   .port[data-side=bottom] { top: 100%; left: 50%; }
@@ -188,6 +187,7 @@
     Tolerance <input type="number" id="tol-input" value="5" min="0" max="50" step="1" title="Balance tolerance %" /> %
   </div>
   <div class="sep"></div>
+  <button id="btn-connect" onclick="toggleConnectMode()">Connect</button>
   <button onclick="autoArrange()">Auto Arrange</button>
   <button onclick="fitView()">Fit</button>
   <button class="btn-accent" onclick="exportCSV()">Export CSV</button>
@@ -445,18 +445,14 @@ function addCard(data) {
     <div class="card-inner"><div class="svgholder">${svgFor(data)}</div></div>
     <div class="card-label">#${esc(data.int_id)} &mdash; ${esc(data.ns_street)} &amp; ${esc(data.ew_street)}</div>
     <button class="card-edit-btn" title="Edit volumes" onclick="event.stopPropagation();openEdit('${data.id}')">✏</button>
-    <div class="port" data-card="${data.id}" data-side="top"></div>
-    <div class="port" data-card="${data.id}" data-side="right"></div>
-    <div class="port" data-card="${data.id}" data-side="bottom"></div>
-    <div class="port" data-card="${data.id}" data-side="left"></div>
   `;
-  el.querySelectorAll('.port').forEach(port => {
-    port.addEventListener('mousedown', e => e.stopPropagation());
-    port.addEventListener('click', e => onPortClick(e, data.id, port.dataset.side, port));
+  el.addEventListener('click', e => {
+    if (e.target.closest('.card-edit-btn')) return;
+    onCardClickForConnect(data.id);
   });
 
   el.addEventListener('mousedown', e => {
-    if (e.target.classList.contains('port') || e.target.classList.contains('card-edit-btn')) return;
+    if (e.target.classList.contains('card-edit-btn')) return;
     e.preventDefault();
     dragging = { id: data.id, sx: e.clientX, sy: e.clientY, cx: parseFloat(el.style.left), cy: parseFloat(el.style.top) };
   });
@@ -641,30 +637,50 @@ async function saveEdit() {
 
 
 // ════════════════════════════════════════════════
-// PORT / CONNECT  (click port → click port)
+// CONNECT MODE  (toolbar button → click card → click card)
 // ════════════════════════════════════════════════
-function onPortClick(e, cardId, side, port) {
-  e.stopPropagation();
-  e.preventDefault();
-  if (!connFrom) {
-    connFrom = { cardId, side };
-    port.classList.add('lit');
+let connectMode = false;
+
+function toggleConnectMode() {
+  connectMode = !connectMode;
+  connFrom = null;
+  const btn = document.getElementById('btn-connect');
+  if (connectMode) {
+    btn.classList.add('on');
     wrap.classList.add('connecting');
-    setHint('Now click a port on another card to connect — Esc to cancel');
+    setHint('Click the FROM intersection, then the TO intersection — Esc to cancel');
   } else {
-    if (connFrom.cardId === cardId) { cancelConn(); return; }
-    const dir = guessDir(connFrom.cardId, cardId);
-    persistConn(connFrom.cardId, connFrom.side, cardId, side, dir);
-    cancelConn();
+    btn.classList.remove('on');
+    wrap.classList.remove('connecting');
+    setHint('');
   }
 }
 
-document.addEventListener('keydown', e => { if (e.key === 'Escape') cancelConn(); });
-
-function cancelConn() {
-  document.querySelectorAll('.port.lit').forEach(p => p.classList.remove('lit'));
-  connFrom = null; wrap.classList.remove('connecting'); setHint('');
+function onCardClickForConnect(cardId) {
+  if (!connectMode) return;
+  if (!connFrom) {
+    connFrom = { cardId };
+    document.getElementById('card-' + cardId).classList.add('conn-selected');
+    setHint('Now click the TO intersection — Esc to cancel');
+  } else {
+    if (connFrom.cardId === cardId) return;
+    const dir = guessDir(connFrom.cardId, cardId);
+    const fromSide = dir === 'wb' ? 'left' : dir === 'nb' ? 'bottom' : dir === 'sb' ? 'top' : 'right';
+    const toSide   = dir === 'wb' ? 'right' : dir === 'nb' ? 'top' : dir === 'sb' ? 'bottom' : 'left';
+    persistConn(connFrom.cardId, fromSide, cardId, toSide, dir);
+    document.getElementById('card-' + connFrom.cardId)?.classList.remove('conn-selected');
+    connFrom = null;
+    setHint('Click the FROM intersection, then the TO intersection — Esc to cancel');
+  }
 }
+
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape' && connectMode) {
+    document.querySelectorAll('.conn-selected').forEach(el => el.classList.remove('conn-selected'));
+    connFrom = null;
+    toggleConnectMode();
+  }
+});
 
 function guessDir(fromId, toId) {
   const from = cards[fromId], to = cards[toId];
