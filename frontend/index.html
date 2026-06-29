@@ -436,19 +436,21 @@ const inlineInput = document.getElementById('svg-inline-input');
 let inlineState = null; // { cardId, field, period }
 
 function attachSvgClickHandlers(cardId) {
-  const { el, data } = cards[cardId];
+  const { el } = cards[cardId];
   const svgEl = el.querySelector('.svgholder svg');
   if (!svgEl) return;
   svgEl.querySelectorAll('text[data-field]').forEach(textEl => {
     const field = textEl.dataset.field;
     textEl.style.cursor = 'pointer';
-    textEl.onclick = e => {
+    textEl.onmousedown = e => {
+      e.preventDefault(); // keeps focus on inlineInput — prevents blur from firing
       e.stopPropagation();
+      // commit previous edit synchronously before switching fields
+      flushInlineEdit();
       const period = scenario === 'pm' ? 'pm' : 'am';
       const vols = period === 'am' ? cards[cardId].data.am_volumes : cards[cardId].data.pm_volumes;
-      const currentVal = vols?.[field] ?? '0';
       const rect = textEl.getBoundingClientRect();
-      inlineInput.value = currentVal;
+      inlineInput.value = vols?.[field] ?? '0';
       inlineInput.style.display = 'block';
       inlineInput.style.left = rect.left + 'px';
       inlineInput.style.top  = (rect.top - 4) + 'px';
@@ -459,9 +461,8 @@ function attachSvgClickHandlers(cardId) {
   });
 }
 
-async function commitInlineEdit() {
+function flushInlineEdit() {
   if (!inlineState) return;
-  inlineInput.style.display = 'none';
   const { cardId, field, period } = inlineState;
   inlineState = null;
   const val = Math.max(0, parseInt(inlineInput.value) || 0);
@@ -471,18 +472,22 @@ async function commitInlineEdit() {
   if (period === 'am') newAm[field] = String(val); else newPm[field] = String(val);
   const updates = { am_volumes: newAm, pm_volumes: newPm };
   Object.assign(data, updates);
-  // Patch just the single text node — don't re-render the whole SVG
-  // so that other onclick handlers on sibling text nodes stay alive
   const svgEl = cards[cardId]?.el.querySelector('.svgholder svg');
   const textNode = svgEl?.querySelector(`text[data-field="${field}"]`);
   if (textNode) textNode.textContent = String(val);
   redrawConns();
-  await sb.from('intersections').update(updates).eq('id', cardId);
+  sb.from('intersections').update(updates).eq('id', cardId);
+}
+
+function commitInlineEdit() {
+  if (!inlineState) return;
+  inlineInput.style.display = 'none';
+  flushInlineEdit();
 }
 
 inlineInput.addEventListener('blur', commitInlineEdit);
 inlineInput.addEventListener('keydown', e => {
-  if (e.key === 'Enter') inlineInput.blur();
+  if (e.key === 'Enter') { inlineInput.style.display = 'none'; flushInlineEdit(); }
   if (e.key === 'Escape') { inlineState = null; inlineInput.style.display = 'none'; }
 });
 
