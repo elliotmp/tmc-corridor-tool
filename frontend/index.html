@@ -1107,7 +1107,9 @@ function subscribeRealtime() {
 function handleIntChange({eventType,new:n,old:o}) {
   if(eventType==='UPDATE'&&cards[n.id]){
     cards[n.id].el.style.left=n.x+'px'; cards[n.id].el.style.top=n.y+'px';
-    cards[n.id].data={...cards[n.id].data,...n};
+    // Keep local volumes — server may lag behind inline edits (race with position saves)
+    const { am_volumes, pm_volumes, ...rest } = n;
+    cards[n.id].data = { ...cards[n.id].data, ...rest };
     if (!inlineState || inlineState.cardId !== n.id) {
       cards[n.id].el.querySelector('.svgholder').innerHTML=svgFor(cards[n.id].data);
       attachSvgClickHandlers(n.id);
