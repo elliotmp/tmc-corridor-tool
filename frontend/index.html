@@ -188,7 +188,34 @@
   <div class="sep"></div>
   <button onclick="autoArrange()">Auto Arrange</button>
   <button onclick="fitView()">Fit</button>
+  <button onclick="openAddInt()">+ Intersection</button>
   <button class="btn-accent" onclick="exportCSV()">Export CSV</button>
+</div>
+
+<!-- Add Intersection overlay -->
+<div id="addint-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:600;display:none;align-items:center;justify-content:center">
+  <div class="box" style="min-width:340px">
+    <h2>Add Intersection</h2>
+    <div class="field"><label>Intersection ID</label><input type="text" id="ai-intid" placeholder="e.g. 5"></div>
+    <div class="field"><label>N/S Street</label><input type="text" id="ai-ns" placeholder="e.g. Main St"></div>
+    <div class="field"><label>E/W Street</label><input type="text" id="ai-ew" placeholder="e.g. 1st Ave"></div>
+    <div class="row">
+      <button class="btn-accent" style="flex:1" onclick="doAddInt()">Add</button>
+      <button onclick="document.getElementById('addint-overlay').style.display='none'">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<!-- Direction picker (shown after drag-to-connect drop) -->
+<div id="dir-picker" style="display:none;position:fixed;z-index:700;background:var(--surface);border:1px solid #2a2a4a;border-radius:10px;padding:10px;box-shadow:0 4px 20px rgba(0,0,0,.5)">
+  <div style="font-size:11px;color:var(--muted);margin-bottom:8px;text-align:center">Direction of travel</div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
+    <button onclick="pickDir('eb')">→ EB</button>
+    <button onclick="pickDir('wb')">← WB</button>
+    <button onclick="pickDir('nb')">↑ NB</button>
+    <button onclick="pickDir('sb')">↓ SB</button>
+  </div>
+  <button onclick="document.getElementById('dir-picker').style.display='none'" style="margin-top:8px;width:100%;background:none;border:none;color:var(--muted);font-size:12px;cursor:pointer">Cancel</button>
 </div>
 
 
@@ -335,7 +362,10 @@ async function showProjPicker() {
     const item = document.createElement('div');
     item.className = 'proj-item';
     item.innerHTML = `<div><b>${esc(p.name)}</b><br><small>${new Date(p.created_at).toLocaleDateString()}</small></div>
-      <button class="proj-del" onclick="event.stopPropagation();deleteProject('${p.id}')">×</button>`;
+      <div style="display:flex;gap:4px">
+        <button class="proj-del" style="color:#60a5fa;border-color:#60a5fa;font-size:12px;padding:2px 7px;opacity:.7" onclick="event.stopPropagation();duplicateProject('${p.id}',${JSON.stringify(p.name)})">⧉</button>
+        <button class="proj-del" onclick="event.stopPropagation();deleteProject('${p.id}')">×</button>
+      </div>`;
     item.onclick = () => openProject(p);
     list.appendChild(item);
   });
@@ -348,6 +378,50 @@ async function createProject() {
   if (error) { toast('Error: ' + error.message); return; }
   document.getElementById('new-proj-input').value = '';
   openProject(data);
+}
+
+function openAddInt() {
+  if (!project) { toast('Open a project first.'); return; }
+  ['ai-intid','ai-ns','ai-ew'].forEach(id => document.getElementById(id).value = '');
+  document.getElementById('addint-overlay').style.display = 'flex';
+}
+
+async function doAddInt() {
+  const intId  = document.getElementById('ai-intid').value.trim();
+  const ns     = document.getElementById('ai-ns').value.trim();
+  const ew     = document.getElementById('ai-ew').value.trim();
+  if (!intId) { toast('Intersection ID is required.'); return; }
+  document.getElementById('addint-overlay').style.display = 'none';
+  const existing = Object.values(cards);
+  const x = existing.length ? Math.max(...existing.map(c => parseFloat(c.el.style.left))) + 300 : 100;
+  const y = existing.length ? parseFloat(existing[0].el.style.top) : 100;
+  const rec = { project_id: project.id, int_id: intId, ns_street: ns, ew_street: ew, x, y, sort_order: existing.length, am_volumes: {}, pm_volumes: {} };
+  const { data, error } = await sb.from('intersections').insert(rec).select().single();
+  if (error) { toast('Error: ' + error.message); return; }
+  addCard(data);
+  document.getElementById('empty').style.display = 'none';
+  toast(`Added intersection ${intId}`);
+}
+
+async function duplicateProject(id, name) {
+  if (!confirm(`Duplicate "${name}"?`)) return;
+  const newName = name + ' (copy)';
+  const { data: newProj, error: pe } = await sb.from('projects').insert({ name: newName }).select().single();
+  if (pe) { toast('Error: ' + pe.message); return; }
+  const { data: ints } = await sb.from('intersections').select('*').eq('project_id', id);
+  const { data: connsData } = await sb.from('connectors').select('*').eq('project_id', id);
+  const idMap = {};
+  for (const int of (ints || [])) {
+    const { id: oldId, ...rest } = int;
+    const { data: ni } = await sb.from('intersections').insert({ ...rest, project_id: newProj.id }).select().single();
+    if (ni) idMap[oldId] = ni.id;
+  }
+  for (const c of (connsData || [])) {
+    const { id: _, ...rest } = c;
+    await sb.from('connectors').insert({ ...rest, project_id: newProj.id, from_intersection_id: idMap[c.from_intersection_id], to_intersection_id: idMap[c.to_intersection_id] });
+  }
+  toast(`Duplicated as "${newName}"`);
+  showProjPicker();
 }
 
 async function deleteProject(id) {
@@ -677,11 +751,24 @@ document.addEventListener('mouseup', e => {
   const targetId = targetCard.id.replace('card-', '');
   if (targetId === fromId) return;
 
-  const dir = guessDir(fromId, targetId);
+  // Show direction picker instead of auto-guessing
+  pendingConn = { fromId, targetId };
+  const picker = document.getElementById('dir-picker');
+  picker.style.display = 'block';
+  picker.style.left = (e.clientX - 80) + 'px';
+  picker.style.top  = (e.clientY + 12) + 'px';
+});
+
+let pendingConn = null;
+function pickDir(dir) {
+  document.getElementById('dir-picker').style.display = 'none';
+  if (!pendingConn) return;
+  const { fromId, targetId } = pendingConn;
+  pendingConn = null;
   const sides = { eb:{from:'right',to:'left'}, wb:{from:'left',to:'right'}, nb:{from:'top',to:'bottom'}, sb:{from:'bottom',to:'top'} };
   const {from: fromSide, to: toSide} = sides[dir];
   persistConn(fromId, fromSide, targetId, toSide, dir);
-});
+}
 
 document.addEventListener('keydown', e => { if (e.key==='Escape' && connFrom) {
   document.querySelectorAll('.port.lit,.port.snap-lit').forEach(p=>{p.classList.remove('lit');p.classList.remove('snap-lit');});
