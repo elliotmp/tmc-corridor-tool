@@ -971,7 +971,8 @@ document.addEventListener('mouseup', async e => {
     const {id}=dragging, el=cards[id]?.el;
     const x=parseFloat(el.style.left), y=parseFloat(el.style.top);
     dragging=null;
-    await sb.from('intersections').update({x,y}).eq('id',id);
+    const { am_volumes, pm_volumes } = cards[id]?.data || {};
+    await sb.from('intersections').update({x, y, am_volumes, pm_volumes}).eq('id',id);
   }
 });
 
