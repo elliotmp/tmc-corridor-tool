@@ -206,17 +206,6 @@
   </div>
 </div>
 
-<!-- Direction picker (shown after drag-to-connect drop) -->
-<div id="dir-picker" style="display:none;position:fixed;z-index:700;background:var(--surface);border:1px solid #2a2a4a;border-radius:10px;padding:10px;box-shadow:0 4px 20px rgba(0,0,0,.5)">
-  <div style="font-size:11px;color:var(--muted);margin-bottom:8px;text-align:center">Direction of travel</div>
-  <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
-    <button onclick="pickDir('eb')">→ EB</button>
-    <button onclick="pickDir('wb')">← WB</button>
-    <button onclick="pickDir('nb')">↑ NB</button>
-    <button onclick="pickDir('sb')">↓ SB</button>
-  </div>
-  <button onclick="document.getElementById('dir-picker').style.display='none'" style="margin-top:8px;width:100%;background:none;border:none;color:var(--muted);font-size:12px;cursor:pointer">Cancel</button>
-</div>
 
 
 <!-- Inline SVG volume input -->
@@ -751,24 +740,14 @@ document.addEventListener('mouseup', e => {
   const targetId = targetCard.id.replace('card-', '');
   if (targetId === fromId) return;
 
-  // Show direction picker instead of auto-guessing
-  pendingConn = { fromId, targetId };
-  const picker = document.getElementById('dir-picker');
-  picker.style.display = 'block';
-  picker.style.left = (e.clientX - 80) + 'px';
-  picker.style.top  = (e.clientY + 12) + 'px';
-});
-
-let pendingConn = null;
-function pickDir(dir) {
-  document.getElementById('dir-picker').style.display = 'none';
-  if (!pendingConn) return;
-  const { fromId, targetId } = pendingConn;
-  pendingConn = null;
-  const sides = { eb:{from:'right',to:'left'}, wb:{from:'left',to:'right'}, nb:{from:'top',to:'bottom'}, sb:{from:'bottom',to:'top'} };
-  const {from: fromSide, to: toSide} = sides[dir];
+  // Direction comes from which port node was dragged from
+  const sideToDir = { right:'eb', left:'wb', top:'nb', bottom:'sb' };
+  const sideToOpp = { right:'left', left:'right', top:'bottom', bottom:'top' };
+  const fromSide = savedFrom.side;
+  const dir = sideToDir[fromSide] || 'eb';
+  const toSide = sideToOpp[fromSide];
   persistConn(fromId, fromSide, targetId, toSide, dir);
-}
+});
 
 document.addEventListener('keydown', e => { if (e.key==='Escape' && connFrom) {
   document.querySelectorAll('.port.lit,.port.snap-lit').forEach(p=>{p.classList.remove('lit');p.classList.remove('snap-lit');});
