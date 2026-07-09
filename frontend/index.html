@@ -192,6 +192,7 @@
   <button onclick="autoArrange()">Auto Arrange</button>
   <button onclick="fitView()">Fit</button>
   <button onclick="openAddInt()">+ Intersection</button>
+  <button id="undo-btn" onclick="undo()" disabled title="Undo (Ctrl+Z)">↩ Undo</button>
   <button onclick="saveAll()" id="save-btn">Save</button>
   <button class="btn-accent" onclick="exportCSV()">Export CSV</button>
 </div>
@@ -321,6 +322,17 @@ let project  = null;
 let scenario = 'am';
 let cards    = {};   // id → { el, data }
 let conns    = [];
+const undoStack = [];
+function pushUndo(fn) {
+  undoStack.push(fn);
+  if (undoStack.length > 30) undoStack.shift();
+  document.getElementById('undo-btn').disabled = false;
+}
+async function undo() {
+  if (!undoStack.length) return;
+  await undoStack.pop()();
+  document.getElementById('undo-btn').disabled = undoStack.length === 0;
+}
 let connFrom = null;
 let dragging = null;
 let panning  = false, panOrigin = null;
@@ -434,12 +446,35 @@ async function duplicateProject(id, name) {
 
 async function deleteIntersection(id) {
   if (!confirm('Delete this intersection and its connectors?')) return;
+  const { data: intSnap } = await sb.from('intersections').select('*').eq('id', id).single();
+  const { data: connSnap } = await sb.from('connectors').select('*').or(`from_intersection_id.eq.${id},to_intersection_id.eq.${id}`);
   await sb.from('connectors').delete().or(`from_intersection_id.eq.${id},to_intersection_id.eq.${id}`);
   await sb.from('intersections').delete().eq('id', id);
   cards[id]?.el.remove();
   delete cards[id];
   conns = conns.filter(c => c.from_intersection_id !== id && c.to_intersection_id !== id);
   redrawConns();
+  pushUndo(async () => {
+    if (!intSnap) return;
+    const { data: ni } = await sb.from('intersections').insert({
+      project_id: intSnap.project_id, int_id: intSnap.int_id,
+      ns_street: intSnap.ns_street, ew_street: intSnap.ew_street,
+      x: intSnap.x, y: intSnap.y, sort_order: intSnap.sort_order,
+      am_volumes: intSnap.am_volumes, pm_volumes: intSnap.pm_volumes,
+    }).select().single();
+    if (!ni) return;
+    for (const c of (connSnap || [])) {
+      const fromId = c.from_intersection_id === id ? ni.id : c.from_intersection_id;
+      const toId   = c.to_intersection_id   === id ? ni.id : c.to_intersection_id;
+      if (!cards[fromId] && fromId !== ni.id) continue;
+      if (!cards[toId]   && toId   !== ni.id) continue;
+      await sb.from('connectors').insert({
+        project_id: c.project_id, from_intersection_id: fromId, to_intersection_id: toId,
+        from_side: c.from_side, to_side: c.to_side, direction: c.direction,
+      });
+    }
+    toast('Undo: intersection restored');
+  });
 }
 
 async function deleteProject(id) {
@@ -565,6 +600,8 @@ function flushInlineEdit() {
   inlineState = null;
   const val = Math.max(0, parseInt(inlineInput.value) || 0);
   const { data } = cards[cardId];
+  const prevAm = { ...data.am_volumes };
+  const prevPm = { ...data.pm_volumes };
   const newAm = { ...data.am_volumes };
   const newPm = { ...data.pm_volumes };
   if (period === 'am') newAm[field] = String(val); else newPm[field] = String(val);
@@ -575,6 +612,15 @@ function flushInlineEdit() {
   if (textNode) textNode.textContent = String(val);
   redrawConns();
   sb.from('intersections').update(updates).eq('id', cardId);
+  pushUndo(async () => {
+    if (!cards[cardId]) return;
+    Object.assign(cards[cardId].data, { am_volumes: prevAm, pm_volumes: prevPm });
+    cards[cardId].el.querySelector('.svgholder').innerHTML = svgFor(cards[cardId].data);
+    attachSvgClickHandlers(cardId);
+    redrawConns();
+    await sb.from('intersections').update({ am_volumes: prevAm, pm_volumes: prevPm }).eq('id', cardId);
+    toast('Undo: volume restored');
+  });
 }
 
 function commitInlineEdit() {
@@ -804,7 +850,9 @@ document.addEventListener('mouseup', e => {
   persistConn(fromId, fromSide, targetId, toSide, dir);
 });
 
-document.addEventListener('keydown', e => { if (e.key==='Escape' && connFrom) {
+document.addEventListener('keydown', e => {
+  if ((e.ctrlKey||e.metaKey) && e.key==='z') { e.preventDefault(); undo(); return; }
+  if (e.key==='Escape' && connFrom) {
   document.querySelectorAll('.port.lit,.port.snap-lit').forEach(p=>{p.classList.remove('lit');p.classList.remove('snap-lit');});
   if (dragLine){dragLine.remove();dragLine=null;} connFrom=null;
 }});
@@ -996,7 +1044,19 @@ const S = 260; // card size in world px
     hit.title = 'Double-click to delete link';
     hit.addEventListener('dblclick', e => {
       e.stopPropagation();
-      if (confirm('Delete this link?')) removeConn(c.id);
+      if (confirm('Delete this link?')) {
+        const snap = conns.find(x => x.id === c.id);
+        removeConn(c.id);
+        if (snap) pushUndo(async () => {
+          const { data: nc } = await sb.from('connectors').insert({
+            project_id: snap.project_id, from_intersection_id: snap.from_intersection_id,
+            to_intersection_id: snap.to_intersection_id, from_side: snap.from_side,
+            to_side: snap.to_side, direction: snap.direction,
+          }).select().single();
+          if (nc) { conns.push(nc); redrawConns(); }
+          toast('Undo: connector restored');
+        });
+      }
     });
     connHits.appendChild(hit);
   });
