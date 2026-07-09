@@ -715,11 +715,32 @@ document.addEventListener('mousemove', e => {
   const {x,y} = toWorld(e.clientX, e.clientY);
   dragLine.setAttribute('x2', x);
   dragLine.setAttribute('y2', y);
-  // Highlight target card
+  // Highlight target card and snap to nearest port on it
   document.querySelectorAll('.card.conn-hover').forEach(el=>el.classList.remove('conn-hover'));
+  document.querySelectorAll('.port.snap-lit').forEach(p=>p.classList.remove('snap-lit'));
   const targetId = cardAtWorld(x, y, connFrom.cardId);
-  if (targetId) cards[targetId]?.el.classList.add('conn-hover');
+  if (targetId) {
+    cards[targetId]?.el.classList.add('conn-hover');
+    const nearest = nearestPort(targetId, x, y);
+    if (nearest) {
+      cards[targetId].el.querySelector(`.port[data-side="${nearest}"]`)?.classList.add('snap-lit');
+    }
+  }
 });
+
+function nearestPort(cardId, wx, wy) {
+  const el = cards[cardId]?.el;
+  if (!el) return null;
+  const cx = parseFloat(el.style.left), cy = parseFloat(el.style.top);
+  const S = el.offsetWidth;
+  const ports = { top:[cx+S/2, cy], bottom:[cx+S/2, cy+S], left:[cx, cy+S/2], right:[cx+S, cy+S/2] };
+  let best = null, bestD = Infinity;
+  for (const [side, [px, py]] of Object.entries(ports)) {
+    const d = Math.hypot(wx-px, wy-py);
+    if (d < bestD) { bestD = d; best = side; }
+  }
+  return best;
+}
 
 document.addEventListener('mouseup', e => {
   if (!connFrom) return;
@@ -740,12 +761,11 @@ document.addEventListener('mouseup', e => {
   const targetId = targetCard.id.replace('card-', '');
   if (targetId === fromId) return;
 
-  // Direction comes from which port node was dragged from
   const sideToDir = { right:'eb', left:'wb', top:'nb', bottom:'sb' };
-  const sideToOpp = { right:'left', left:'right', top:'bottom', bottom:'top' };
   const fromSide = savedFrom.side;
   const dir = sideToDir[fromSide] || 'eb';
-  const toSide = sideToOpp[fromSide];
+  const {x: wx, y: wy} = toWorld(e.clientX, e.clientY);
+  const toSide = nearestPort(targetId, wx, wy) || 'left';
   persistConn(fromId, fromSide, targetId, toSide, dir);
 });
 
