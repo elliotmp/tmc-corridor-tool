@@ -1002,6 +1002,9 @@ document.addEventListener('mouseup', async e => {
 function applyTransform() {
   world.style.transform=`translate(${tx}px,${ty}px) scale(${scale})`;
   document.getElementById('status-zoom').textContent=Math.round(scale*100)+'%';
+  // Counter-scale labels so they stay ~12px on screen regardless of zoom
+  const labelPx = Math.round(Math.min(48, 12 / scale));
+  document.querySelectorAll('.card-label').forEach(el => el.style.fontSize = labelPx + 'px');
   redrawConns();
 }
 
