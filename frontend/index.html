@@ -397,9 +397,11 @@ async function doAddInt() {
 async function duplicateProject(id, name) {
   if (!confirm(`Duplicate "${name}"?`)) return;
   const newName = name + ' (copy)';
+  toast('Duplicating…');
   const { data: newProj, error: pe } = await sb.from('projects').insert({ name: newName }).select().single();
-  if (pe) { toast('Error: ' + pe.message); return; }
-  const { data: ints } = await sb.from('intersections').select('*').eq('project_id', id);
+  if (pe) { toast('Error creating project: ' + pe.message); return; }
+  const { data: ints, error: ie2 } = await sb.from('intersections').select('*').eq('project_id', id);
+  if (ie2) { toast('Error reading intersections: ' + ie2.message); return; }
   const { data: connsData } = await sb.from('connectors').select('*').eq('project_id', id);
   const idMap = {};
   for (const int of (ints || [])) {
@@ -413,21 +415,30 @@ async function duplicateProject(id, name) {
     if (ni) idMap[int.id] = ni.id;
   }
   for (const c of (connsData || [])) {
-    await sb.from('connectors').insert({
+    const fromId = idMap[c.from_intersection_id];
+    const toId   = idMap[c.to_intersection_id];
+    if (!fromId || !toId) continue;
+    const { error: ce } = await sb.from('connectors').insert({
       project_id: newProj.id,
-      from_intersection_id: idMap[c.from_intersection_id],
-      to_intersection_id: idMap[c.to_intersection_id],
+      from_intersection_id: fromId,
+      to_intersection_id: toId,
       from_side: c.from_side, to_side: c.to_side, direction: c.direction,
     });
+    if (ce) toast('Warning: connector not copied — ' + ce.message);
   }
   toast(`Duplicated as "${newName}"`);
   showProjPicker();
 }
 
 async function deleteProject(id) {
-  if (!confirm('Delete this project and all its data?')) return;
-  await sb.from('projects').delete().eq('id', id);
+  if (!confirm('Delete this project and all its data? This cannot be undone.')) return;
+  // delete children first to avoid FK constraint errors
+  await sb.from('connectors').delete().eq('project_id', id);
+  await sb.from('intersections').delete().eq('project_id', id);
+  const { error } = await sb.from('projects').delete().eq('id', id);
+  if (error) { toast('Error deleting project: ' + error.message); return; }
   if (project?.id === id) { project = null; document.getElementById('proj-label').textContent = 'No project'; clearCanvas(); }
+  toast('Project deleted.');
   showProjPicker();
 }
 
