@@ -402,13 +402,22 @@ async function duplicateProject(id, name) {
   const { data: connsData } = await sb.from('connectors').select('*').eq('project_id', id);
   const idMap = {};
   for (const int of (ints || [])) {
-    const { id: oldId, ...rest } = int;
-    const { data: ni } = await sb.from('intersections').insert({ ...rest, project_id: newProj.id }).select().single();
-    if (ni) idMap[oldId] = ni.id;
+    const { data: ni, error: ie } = await sb.from('intersections').insert({
+      project_id: newProj.id,
+      int_id: int.int_id, ns_street: int.ns_street, ew_street: int.ew_street,
+      x: int.x, y: int.y, sort_order: int.sort_order,
+      am_volumes: int.am_volumes, pm_volumes: int.pm_volumes,
+    }).select().single();
+    if (ie) { toast('Error copying intersection: ' + ie.message); return; }
+    if (ni) idMap[int.id] = ni.id;
   }
   for (const c of (connsData || [])) {
-    const { id: _, ...rest } = c;
-    await sb.from('connectors').insert({ ...rest, project_id: newProj.id, from_intersection_id: idMap[c.from_intersection_id], to_intersection_id: idMap[c.to_intersection_id] });
+    await sb.from('connectors').insert({
+      project_id: newProj.id,
+      from_intersection_id: idMap[c.from_intersection_id],
+      to_intersection_id: idMap[c.to_intersection_id],
+      from_side: c.from_side, to_side: c.to_side, direction: c.direction,
+    });
   }
   toast(`Duplicated as "${newName}"`);
   showProjPicker();
