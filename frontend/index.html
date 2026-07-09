@@ -149,6 +149,14 @@
   <div class="box">
     <h2>Upload Data</h2>
     <div class="field"><label>Volume CSV</label><input type="file" id="csv-file" accept=".csv" /></div>
+    <div class="field" style="display:flex;gap:12px;align-items:center">
+      <label style="display:flex;align-items:center;gap:6px;cursor:pointer">
+        <input type="radio" name="upload-mode" value="replace" checked /> Full replace <small style="color:var(--muted)">(clears layout)</small>
+      </label>
+      <label style="display:flex;align-items:center;gap:6px;cursor:pointer">
+        <input type="radio" name="upload-mode" value="volumes" /> Update volumes only <small style="color:var(--muted)">(keeps layout &amp; connectors)</small>
+      </label>
+    </div>
     <div id="upload-status"></div>
     <div class="row" style="justify-content:flex-end">
       <button onclick="closeUpload()">Cancel</button>
@@ -1189,18 +1197,47 @@ function closeUpload() { document.getElementById('upload-overlay').style.display
 async function doUpload() {
   const csvFile = document.getElementById('csv-file').files[0];
   if (!csvFile) { toast('Select a CSV file.'); return; }
+  const mode = document.querySelector('input[name="upload-mode"]:checked')?.value || 'replace';
   const status = document.getElementById('upload-status');
   status.innerHTML = '<span class="spinner"></span> Reading…';
   try {
     const rows = parseCSV(await readText(csvFile));
     status.innerHTML = '<span class="spinner"></span> Saving…';
-    await sb.from('connectors').delete().eq('project_id', project.id);
-    await sb.from('intersections').delete().eq('project_id', project.id);
-    const records = rows.map((row,i) => buildRecord(row, i));
-    const { error } = await sb.from('intersections').insert(records);
-    if (error) throw new Error(error.message);
-    status.textContent = `✓ Saved ${records.length} intersections.`;
-    setTimeout(() => { closeUpload(); loadCanvas(); }, 800);
+    if (mode === 'volumes') {
+      const { data: existing } = await sb.from('intersections').select('id,int_id').eq('project_id', project.id);
+      const byIntId = {};
+      (existing || []).forEach(r => { byIntId[String(r.int_id)] = r.id; });
+      let matched = 0, skipped = 0;
+      for (const row of rows) {
+        const intId = String(row['Intersection'] || '');
+        const dbId = byIntId[intId];
+        if (!dbId) { skipped++; continue; }
+        const amVols = {}, pmVols = {};
+        for (const f of VOL_FIELDS) {
+          const { am, pm } = parseAmPm(row[f] || '0 (0)');
+          amVols[f] = am; pmVols[f] = pm;
+        }
+        const { error } = await sb.from('intersections').update({ am_volumes: amVols, pm_volumes: pmVols }).eq('id', dbId);
+        if (error) throw new Error(error.message);
+        if (cards[dbId]) {
+          Object.assign(cards[dbId].data, { am_volumes: amVols, pm_volumes: pmVols });
+          cards[dbId].el.querySelector('.svgholder').innerHTML = svgFor(cards[dbId].data);
+          attachSvgClickHandlers(dbId);
+        }
+        matched++;
+      }
+      redrawConns();
+      status.textContent = `✓ Updated ${matched} intersection${matched!==1?'s':''}${skipped ? ` (${skipped} not matched by ID)` : ''}.`;
+      setTimeout(() => closeUpload(), 1200);
+    } else {
+      await sb.from('connectors').delete().eq('project_id', project.id);
+      await sb.from('intersections').delete().eq('project_id', project.id);
+      const records = rows.map((row, i) => buildRecord(row, i));
+      const { error } = await sb.from('intersections').insert(records);
+      if (error) throw new Error(error.message);
+      status.textContent = `✓ Saved ${records.length} intersections.`;
+      setTimeout(() => { closeUpload(); loadCanvas(); }, 800);
+    }
   } catch(err) { status.textContent = '✗ ' + err.message; console.error(err); }
 }
 
