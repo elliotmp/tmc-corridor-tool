@@ -411,8 +411,8 @@ async function doAddInt() {
 }
 
 async function duplicateProject(id, name) {
-  if (!confirm(`Duplicate "${name}"?`)) return;
-  const newName = name + ' (copy)';
+  const newName = prompt(`Duplicate "${name}" as:`, name + ' (copy)');
+  if (!newName?.trim()) return;
   toast('Duplicating…');
   const { data: newProj, error: pe } = await sb.from('projects').insert({ name: newName }).select().single();
   if (pe) { toast('Error creating project: ' + pe.message); return; }
