@@ -875,14 +875,17 @@ const S = 260; // card size in world px
     if (!fc || !tc) return;
     const fx = parseFloat(fc.el.style.left), fy = parseFloat(fc.el.style.top);
     const tx2= parseFloat(tc.el.style.left), ty2= parseFloat(tc.el.style.top);
+    const dirToSide = { eb:'right', wb:'left', nb:'top', sb:'bottom' };
     const sidePos = (bx, by, side) => ({
       right:  [bx+S, by+S/2],
       left:   [bx,   by+S/2],
       top:    [bx+S/2, by],
       bottom: [bx+S/2, by+S],
     }[side]);
-    const fp = sidePos(fx, fy, c.from_side);
-    const tp = sidePos(tx2, ty2, c.to_side);
+    const fromSide = c.from_side || dirToSide[c.direction] || 'right';
+    const toSide   = c.to_side   || dirToSide[REVERSE[c.direction]] || 'left';
+    const fp = sidePos(fx, fy, fromSide);
+    const tp = sidePos(tx2, ty2, toSide);
     if (!fp || !tp) return;
     let x1=fp[0], y1=fp[1], x2=tp[0], y2=tp[1];
     const dx=x2-x1, dy=y2-y1, len=Math.sqrt(dx*dx+dy*dy)||1;
