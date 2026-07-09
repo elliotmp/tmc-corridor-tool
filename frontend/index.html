@@ -862,14 +862,16 @@ const S = 260; // card size in world px
     if (!fc || !tc) return;
     const fx = parseFloat(fc.el.style.left), fy = parseFloat(fc.el.style.top);
     const tx2= parseFloat(tc.el.style.left), ty2= parseFloat(tc.el.style.top);
-    let x1,y1,x2,y2;
-    switch(c.direction){
-      case 'eb': x1=fx+S; y1=fy+S/2; x2=tx2;    y2=ty2+S/2; break;
-      case 'wb': x1=fx;   y1=fy+S/2; x2=tx2+S;  y2=ty2+S/2; break;
-      case 'nb': x1=fx+S/2; y1=fy;   x2=tx2+S/2; y2=ty2+S;  break;
-      case 'sb': x1=fx+S/2; y1=fy+S; x2=tx2+S/2; y2=ty2;    break;
-      default: return;
-    }
+    const sidePos = (bx, by, side) => ({
+      right:  [bx+S, by+S/2],
+      left:   [bx,   by+S/2],
+      top:    [bx+S/2, by],
+      bottom: [bx+S/2, by+S],
+    }[side]);
+    const fp = sidePos(fx, fy, c.from_side);
+    const tp = sidePos(tx2, ty2, c.to_side);
+    if (!fp || !tp) return;
+    let x1=fp[0], y1=fp[1], x2=tp[0], y2=tp[1];
     const dx=x2-x1, dy=y2-y1, len=Math.sqrt(dx*dx+dy*dy)||1;
     const OFF = 22;
     const px=-dy/len*OFF, py=dx/len*OFF; // perpendicular offset
