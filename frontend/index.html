@@ -702,6 +702,24 @@ function openEdit(cardId) {
   const body = document.getElementById('edit-body');
   body.innerHTML = '';
 
+  // Identity fields
+  const idGrid = document.createElement('div');
+  idGrid.className = 'edit-grid';
+  idGrid.style.marginBottom = '4px';
+  idGrid.innerHTML = `
+    <div class="flabel">Int #</div>
+    <input id="ei-intid" type="text" value="${esc(data.int_id)}" style="grid-column:span 2" />
+    <div class="flabel">N/S St</div>
+    <input id="ei-ns" type="text" value="${esc(data.ns_street)}" style="grid-column:span 2" />
+    <div class="flabel">E/W St</div>
+    <input id="ei-ew" type="text" value="${esc(data.ew_street)}" style="grid-column:span 2" />
+  `;
+  body.appendChild(idGrid);
+
+  const divider = document.createElement('div');
+  divider.style.cssText = 'border-top:1px solid #2a2a4a;margin:6px 0 10px';
+  body.appendChild(divider);
+
   DIR_GROUPS.forEach(({ label, fields }) => {
     const sectionLabel = document.createElement('div');
     sectionLabel.className = 'edit-section-label';
@@ -779,11 +797,17 @@ async function saveEdit() {
 
   const newAm = { ...data.am_volumes, ...amVols };
   const newPm = { ...data.pm_volumes, ...pmVols };
-  const updates = { am_volumes: newAm, pm_volumes: newPm };
+  const intId = document.getElementById('ei-intid')?.value.trim() || data.int_id;
+  const ns    = document.getElementById('ei-ns')?.value.trim()    || data.ns_street;
+  const ew    = document.getElementById('ei-ew')?.value.trim()    || data.ew_street;
+  const updates = { am_volumes: newAm, pm_volumes: newPm, int_id: intId, ns_street: ns, ew_street: ew };
   const { error } = await sb.from('intersections').update(updates).eq('id', editingId);
   if (error) { toast('Save failed: ' + error.message); return; }
 
   cards[editingId].data = { ...data, ...updates };
+  // update card label
+  const label = cards[editingId].el.querySelector('.card-label');
+  if (label) label.innerHTML = `#${esc(intId)} &mdash; ${esc(ns)} &amp; ${esc(ew)}`;
   cards[editingId].el.querySelector('.svgholder').innerHTML = svgFor(cards[editingId].data);
   redrawConns();
   closeEdit();
