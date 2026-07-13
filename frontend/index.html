@@ -540,7 +540,7 @@ function addCard(data) {
   el.style.top  = data.y + 'px';
   el.innerHTML = `
     <div class="card-inner"><div class="svgholder">${svgFor(data)}</div></div>
-    <div class="card-label">#${esc(data.int_id)} &mdash; ${esc(data.ns_street)} &amp; ${esc(data.ew_street)}</div>
+    <div class="card-label" title="Double-click to rename">#${esc(data.int_id)} &mdash; ${esc(data.ns_street)} &amp; ${esc(data.ew_street)}</div>
     <button class="card-edit-btn" title="Edit volumes" onclick="event.stopPropagation();openEdit('${data.id}')">✏</button>
     <button class="card-del-btn" title="Delete intersection" onclick="event.stopPropagation();deleteIntersection('${data.id}')">×</button>
     <div class="port" data-card="${data.id}" data-side="top"></div>
@@ -555,9 +555,31 @@ function addCard(data) {
     e.preventDefault();
     dragging = { id: data.id, sx: e.clientX, sy: e.clientY, cx: parseFloat(el.style.left), cy: parseFloat(el.style.top) };
   });
+  el.querySelector('.card-label').addEventListener('dblclick', e => {
+    e.stopPropagation();
+    openRenameInt(data.id);
+  });
   world.appendChild(el);
   cards[data.id] = { el, data };
   attachSvgClickHandlers(data.id);
+}
+
+async function openRenameInt(id) {
+  const { data } = cards[id];
+  const intId  = prompt('Intersection number:', data.int_id);
+  if (intId === null) return;
+  const ns = prompt('N/S street:', data.ns_street);
+  if (ns === null) return;
+  const ew = prompt('E/W street:', data.ew_street);
+  if (ew === null) return;
+  const updates = { int_id: intId.trim(), ns_street: ns.trim(), ew_street: ew.trim() };
+  Object.assign(data, updates);
+  const label = cards[id].el.querySelector('.card-label');
+  label.innerHTML = `#${esc(data.int_id)} &mdash; ${esc(data.ns_street)} &amp; ${esc(data.ew_street)}`;
+  cards[id].el.querySelector('.svgholder').innerHTML = svgFor(data);
+  attachSvgClickHandlers(id);
+  await sb.from('intersections').update(updates).eq('id', id);
+  toast('Intersection updated.');
 }
 
 function svgFor(d) {
