@@ -203,6 +203,7 @@
   <button id="undo-btn" onclick="undo()" disabled title="Undo (Ctrl+Z)">↩ Undo</button>
   <button onclick="saveAll()" id="save-btn">Save</button>
   <button class="btn-accent" onclick="exportCSV()">Export CSV</button>
+  <button onclick="exportNetwork()">Export Network</button>
 </div>
 
 <!-- Add Intersection overlay -->
@@ -1167,6 +1168,82 @@ async function saveAll() {
   ));
   btn.textContent = '✓ Saved'; btn.disabled = false;
   setTimeout(() => { btn.textContent = 'Save'; }, 2000);
+}
+
+function exportNetwork() {
+  if (!project) { toast('Open a project first.'); return; }
+  const ints = Object.values(cards).map(c => c.data);
+  if (!ints.length) { toast('No intersections to export.'); return; }
+
+  // Sort north→south, west→east by canvas position
+  const sorted = [...ints].sort((a, b) => {
+    const ay = parseFloat(cards[a.id].el.style.top),  by2 = parseFloat(cards[b.id].el.style.top);
+    const ax = parseFloat(cards[a.id].el.style.left), bx  = parseFloat(cards[b.id].el.style.left);
+    if (Math.abs(ay - by2) > 40) return ay - by2; // primarily top→bottom (N→S)
+    return ax - bx; // secondarily left→right (W→E)
+  });
+
+  // Build a lookup from db id → enriched object
+  const intMap = {};
+  sorted.forEach((d, rank) => {
+    const x = parseFloat(cards[d.id].el.style.left);
+    const y = parseFloat(cards[d.id].el.style.top);
+    intMap[d.id] = {
+      id: d.id,
+      int_id: d.int_id,
+      ns_street: d.ns_street,
+      ew_street: d.ew_street,
+      canvas_position: { x: Math.round(x), y: Math.round(y) },
+      spatial_rank_n_to_s: rank + 1,
+      am_volumes: d.am_volumes || {},
+      pm_volumes: d.pm_volumes || {},
+    };
+  });
+
+  // Build connector list with computed deltas
+  const SIDE_DIR2 = { right:'EB', left:'WB', top:'NB', bottom:'SB' };
+  const REV2      = { EB:'WB', WB:'EB', NB:'SB', SB:'NB' };
+  const links = conns.map(c => {
+    const fi = intMap[c.from_intersection_id], ti = intMap[c.to_intersection_id];
+    if (!fi || !ti) return null;
+    const depDir = SIDE_DIR2[c.from_side] || c.direction?.toUpperCase() || '?';
+    const arrDir = REV2[SIDE_DIR2[c.to_side]] || REV2[depDir] || '?';
+    const fwdDep = linkDeparture(fi.am_volumes, depDir.toLowerCase());
+    const fwdArr = linkArrival(ti.am_volumes, arrDir.toLowerCase());
+    const revDep = linkDeparture(ti.am_volumes, (SIDE_DIR2[c.to_side]||REV2[depDir]||'?').toLowerCase());
+    const revArr = linkArrival(fi.am_volumes, REV2[depDir]?.toLowerCase() || '?');
+    return {
+      from: { int_id: fi.int_id, name: `${fi.ns_street} & ${fi.ew_street}`, port: c.from_side },
+      to:   { int_id: ti.int_id, name: `${ti.ns_street} & ${ti.ew_street}`, port: c.to_side },
+      travel_direction: depDir,
+      am_balance: {
+        forward:  { departure: fwdDep, arrival: fwdArr, diff: fwdDep - fwdArr },
+        reverse:  { departure: revDep, arrival: revArr, diff: revDep - revArr },
+      },
+    };
+  }).filter(Boolean);
+
+  const output = {
+    _instructions: [
+      "This file describes a TMC corridor network for traffic volume balancing.",
+      "canvas_position: pixel coordinates on the canvas — smaller Y = further north, smaller X = further west.",
+      "spatial_rank_n_to_s: 1 = northernmost intersection.",
+      "am_volumes / pm_volumes: turning movement counts keyed by EBL/EBT/EBR/WBL/WBT/WBR/NBL/NBT/NBR/SBL/SBT/SBR.",
+      "links[].am_balance: forward = traffic traveling in travel_direction; diff = departure minus arrival (negative = more arriving than leaving).",
+      "To rebalance: adjust volumes so diffs approach 0. Return changes as a CSV matching the original format: columns EBL,EBT,...SBR with AM (PM) values.",
+    ],
+    project: project.name,
+    intersections: Object.values(intMap),
+    links,
+  };
+
+  const json = JSON.stringify(output, null, 2);
+  const blob = new Blob([json], { type: 'application/json' });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href = url; a.download = (project.name || 'corridor') + '_network.json';
+  a.click(); URL.revokeObjectURL(url);
+  toast('Network exported.');
 }
 
 function exportCSV() {
