@@ -194,7 +194,8 @@
   </div>
   <div class="sep"></div>
   <div id="tol-wrap">
-    Tolerance <input type="number" id="tol-input" value="5" min="0" max="50" step="1" title="Balance tolerance %" /> %
+    Tolerance <input type="number" id="tol-input" min="0" max="50" step="1" title="Balance tolerance %" /> %
+    <label style="display:flex;align-items:center;gap:4px;cursor:pointer"><input type="checkbox" id="tol-exact" /> Exact</label>
   </div>
   <div class="sep"></div>
   <button onclick="autoArrange()">Auto Arrange</button>
@@ -354,10 +355,24 @@ const wrap     = document.getElementById('canvas-wrap');
 const delBtns  = document.getElementById('del-btns');
 
 function getTolerance() {
-  return parseFloat(document.getElementById('tol-input').value) || 5;
+  if (document.getElementById('tol-exact').checked) return 0;
+  return parseFloat(document.getElementById('tol-input').value) ?? 5;
 }
 
-document.getElementById('tol-input').addEventListener('change', redrawConns);
+function isOk(delta) {
+  if (document.getElementById('tol-exact').checked) return delta.diff === 0;
+  const tol = getTolerance();
+  const pct = delta.dep > 0 ? Math.abs(delta.diff) / ((delta.dep + delta.arr) / 2) * 100 : 0;
+  return pct <= tol;
+}
+
+// persist tolerance settings
+const tolInput = document.getElementById('tol-input');
+const tolExact = document.getElementById('tol-exact');
+tolInput.value = localStorage.getItem('tol-value') ?? '5';
+tolExact.checked = localStorage.getItem('tol-exact') === 'true';
+tolInput.addEventListener('change', () => { localStorage.setItem('tol-value', tolInput.value); redrawConns(); });
+tolExact.addEventListener('change', () => { localStorage.setItem('tol-exact', tolExact.checked); redrawConns(); });
 
 // ════════════════════════════════════════════════
 // PROJECT PICKER
@@ -966,7 +981,6 @@ async function clearAllConns() {
 }
 
 function redrawConns() {
-  const tol = getTolerance();
 const S = 260; // card size in world px
 
   // ── SVG canvas connectors ──
@@ -1004,10 +1018,7 @@ const S = 260; // card size in world px
     const fwd = calcDelta(fc.data, tc.data, depDir,    arrDir);
     const rev = calcDelta(tc.data, fc.data, revDepDir, REVERSE[arrDir]);
 
-    const lineColor = (delta) => {
-      const pct = delta.dep>0 ? Math.abs(delta.diff)/((delta.dep+delta.arr)/2)*100 : 0;
-      return (pct<=tol) ? '#22c55e' : '#ef4444';
-    };
+    const lineColor = (delta) => isOk(delta) ? '#22c55e' : '#ef4444';
 
     const g = document.createElementNS(ns,'g'); g.dataset.cid = c.id;
 
@@ -1039,8 +1050,7 @@ const S = 260; // card size in world px
 
     // Badge centered on its own lane line at midpoint
     const mkBadge = (delta, dir, lx, ly) => {
-      const pct = delta.dep>0 ? Math.abs(delta.diff)/((delta.dep+delta.arr)/2)*100 : 0;
-      const ok = pct<=tol;
+      const ok = isOk(delta);
       const bc = ok ? '#22c55e' : '#ef4444';
       const arrow = DIR_ARROW[dir] || '';
       const sign = delta.diff > 0 ? '+' : '';
