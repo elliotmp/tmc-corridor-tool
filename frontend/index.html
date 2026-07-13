@@ -151,10 +151,10 @@
     <div class="field"><label>Volume CSV</label><input type="file" id="csv-file" accept=".csv" /></div>
     <div class="field" style="display:flex;gap:12px;align-items:center">
       <label style="display:flex;align-items:center;gap:6px;cursor:pointer">
-        <input type="radio" name="upload-mode" value="replace" checked /> Full replace <small style="color:var(--muted)">(clears layout)</small>
+        <input type="radio" name="upload-mode" value="replace" /> Full replace <small style="color:var(--muted)">(clears layout)</small>
       </label>
       <label style="display:flex;align-items:center;gap:6px;cursor:pointer">
-        <input type="radio" name="upload-mode" value="volumes" /> Update volumes only <small style="color:var(--muted)">(keeps layout &amp; connectors)</small>
+        <input type="radio" name="upload-mode" value="volumes" checked /> Update volumes only <small style="color:var(--muted)">(keeps layout &amp; connectors)</small>
       </label>
     </div>
     <div id="upload-status"></div>
@@ -1280,6 +1280,9 @@ async function doUpload() {
   try {
     const rows = parseCSV(await readText(csvFile));
     status.innerHTML = '<span class="spinner"></span> Saving…';
+    if (mode === 'replace') {
+      if (!confirm('⚠️ Full replace will permanently delete all intersections, volumes, and connectors for this project and cannot be undone. Are you sure?')) return;
+    }
     if (mode === 'volumes') {
       const { data: existing } = await sb.from('intersections').select('id,int_id').eq('project_id', project.id);
       const byIntId = {};
