@@ -198,13 +198,13 @@
     <label style="display:flex;align-items:center;gap:4px;cursor:pointer"><input type="checkbox" id="tol-exact" /> Exact</label>
   </div>
   <div class="sep"></div>
-  <button onclick="autoArrange()">Auto Arrange</button>
   <button onclick="fitView()">Fit</button>
   <button onclick="openAddInt()">+ Intersection</button>
   <button id="undo-btn" onclick="undo()" disabled title="Undo (Ctrl+Z)">↩ Undo</button>
   <button onclick="saveAll()" id="save-btn">Save</button>
   <button class="btn-accent" onclick="exportCSV()">Export CSV</button>
   <button onclick="exportNetwork()">Export Network</button>
+  <button onclick="exportSynchro()">Export Synchro</button>
 </div>
 
 <!-- Add Intersection overlay -->
@@ -1224,6 +1224,56 @@ async function saveAll() {
   ));
   btn.textContent = '✓ Saved'; btn.disabled = false;
   setTimeout(() => { btn.textContent = 'Save'; }, 2000);
+}
+
+function exportSynchro() {
+  if (!project) { toast('Open a project first.'); return; }
+  const ints = Object.values(cards).map(c => c.data).sort((a, b) => a.sort_order - b.sort_order);
+  if (!ints.length) { toast('No intersections to export.'); return; }
+
+  const today = new Date();
+  const dateStr = `${today.getMonth()+1}/${today.getDate()}/${today.getFullYear()}`;
+
+  const SYNCHRO_COLS = ['DATE','TIME','INTID','NBL2','NBL','NBT','NBR','NBR2','SBL','SBT','SBR','EBL2','EBL','EBT','EBR','EBR2','WBL2','WBL','WBT','WBR','WBR2','NEL2','NEL','NET','NER','NER2','NWL','NWT','NWR','SEL2','SEL','SET','SER','SER2','SWL2','SWL','SWT','SWR','SWR2'];
+
+  const buildRows = (period, time) => {
+    return ints.map(d => {
+      const v = (period === 'am' ? d.am_volumes : d.pm_volumes) || {};
+      const get = f => v[f] || '';
+      const row = {
+        DATE: dateStr, TIME: time, INTID: d.int_id,
+        NBL2:'', NBL: get('NBL'), NBT: get('NBT'), NBR: get('NBR'), NBR2:'',
+        SBL: get('SBL'), SBT: get('SBT'), SBR: get('SBR'),
+        EBL2:'', EBL: get('EBL'), EBT: get('EBT'), EBR: get('EBR'), EBR2:'',
+        WBL2:'', WBL: get('WBL'), WBT: get('WBT'), WBR: get('WBR'), WBR2:'',
+        NEL2:'', NEL:'', NET:'', NER:'', NER2:'',
+        NWL:'', NWT:'', NWR:'',
+        SEL2:'', SEL:'', SET:'', SER:'', SER2:'',
+        SWL2:'', SWL:'', SWT:'', SWR:'', SWR2:'',
+      };
+      return SYNCHRO_COLS.map(c => row[c] ?? '').join(',');
+    });
+  };
+
+  const header1 = 'Turning Movement Count' + ','.repeat(SYNCHRO_COLS.length - 1);
+  const header2 = '60 Minute Counts' + ','.repeat(SYNCHRO_COLS.length - 1);
+  const colRow  = SYNCHRO_COLS.join(',');
+
+  const buildCSV = (period, time) =>
+    [header1, header2, colRow, ...buildRows(period, time)].join('\n');
+
+  const dl = (content, filename) => {
+    const blob = new Blob([content], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = filename; a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const name = project.name.replace(/\s+/g, '_');
+  dl(buildCSV('am', '800'),  `${name}_AM_VOLUME.CSV`);
+  dl(buildCSV('pm', '1700'), `${name}_PM_VOLUME.CSV`);
+  toast('Synchro files exported (AM + PM).');
 }
 
 function exportNetwork() {
