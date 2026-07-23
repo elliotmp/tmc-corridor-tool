@@ -16,6 +16,11 @@
   #topbar { display: flex; align-items: center; gap: 10px; padding: 7px 14px; background: var(--surface); border-bottom: 1px solid #2a2a4a; flex-shrink: 0; flex-wrap: wrap; }
   #topbar h1 { font-size: 14px; font-weight: 700; color: var(--accent); white-space: nowrap; letter-spacing: .5px; }
   .sep { width: 1px; height: 22px; background: #2a2a4a; }
+  .export-wrap { position: relative; }
+  .export-wrap .export-menu { display: none; position: absolute; top: calc(100% + 4px); right: 0; background: var(--surface2); border: 1px solid #2a2a4a; border-radius: 6px; min-width: 140px; z-index: 500; overflow: hidden; }
+  .export-wrap.open .export-menu { display: block; }
+  .export-menu button { display: block; width: 100%; text-align: left; border: none; border-radius: 0; padding: 8px 14px; font-size: 12px; }
+  .export-menu button:hover { background: #2a2a4a; }
   button, select, input[type=number], input[type=text] {
     background: var(--surface2); color: var(--text); border: 1px solid #2a2a4a;
     border-radius: 5px; padding: 5px 10px; font-size: 12px; cursor: pointer; font-family: inherit;
@@ -206,9 +211,14 @@
   <button onclick="openAddInt()">+ Intersection</button>
   <button id="undo-btn" onclick="undo()" disabled title="Undo (Ctrl+Z)">↩ Undo</button>
   <button onclick="saveAll()" id="save-btn">Save</button>
-  <button class="btn-accent" onclick="exportCSV()">Export CSV</button>
-  <button onclick="exportNetwork()">Export Network</button>
-  <button onclick="exportSynchro()">Export Synchro</button>
+  <div class="export-wrap" id="export-wrap">
+    <button onclick="toggleExportMenu()">Export ▾</button>
+    <div class="export-menu">
+      <button onclick="exportCSV();closeExportMenu()">CSV</button>
+      <button onclick="exportNetwork();closeExportMenu()">JSON</button>
+      <button onclick="exportSynchro();closeExportMenu()">Synchro</button>
+    </div>
+  </div>
 </div>
 
 <!-- Add Intersection overlay -->
@@ -372,6 +382,16 @@ function isOk(delta) {
 
 let connDisplay = localStorage.getItem('conn-display') || 'delta'; // 'delta' | 'volume'
 let rotatingCardId = null; // card currently being rotation-dragged — block realtime resets
+function toggleExportMenu() {
+  document.getElementById('export-wrap').classList.toggle('open');
+}
+function closeExportMenu() {
+  document.getElementById('export-wrap').classList.remove('open');
+}
+document.addEventListener('click', e => {
+  if (!e.target.closest('#export-wrap')) closeExportMenu();
+});
+
 function toggleConnDisplay() {
   connDisplay = connDisplay === 'delta' ? 'volume' : 'delta';
   localStorage.setItem('conn-display', connDisplay);
