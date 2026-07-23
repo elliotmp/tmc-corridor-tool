@@ -1054,13 +1054,15 @@ const S = 260; // card size in world px
     l1.setAttribute('stroke-width','5'); l1.setAttribute('stroke-linecap','round');
     g.appendChild(l1);
 
-    // Line 2 — reverse direction
-    const l2 = document.createElementNS(ns,'line');
-    l2.setAttribute('x1',x2-px); l2.setAttribute('y1',y2-py);
-    l2.setAttribute('x2',x1-px); l2.setAttribute('y2',y1-py);
-    l2.setAttribute('stroke', lineColor(rev));
-    l2.setAttribute('stroke-width','5'); l2.setAttribute('stroke-linecap','round');
-    g.appendChild(l2);
+    // Line 2 — reverse direction (hidden if one-way)
+    if (!c.one_way) {
+      const l2 = document.createElementNS(ns,'line');
+      l2.setAttribute('x1',x2-px); l2.setAttribute('y1',y2-py);
+      l2.setAttribute('x2',x1-px); l2.setAttribute('y2',y1-py);
+      l2.setAttribute('stroke', lineColor(rev));
+      l2.setAttribute('stroke-width','5'); l2.setAttribute('stroke-linecap','round');
+      g.appendChild(l2);
+    }
 
     // Center divider dash
     const cDiv = document.createElementNS(ns,'line');
@@ -1095,8 +1097,8 @@ const S = 260; // card size in world px
       g.appendChild(t);
     };
     // fwd badge on line 1 (offset +), rev badge on line 2 (offset -)
-    mkBadge(fwd, depDir,      mx+px, my+py);
-    mkBadge(rev, revDir,      mx-px, my-py);
+    mkBadge(fwd, depDir, mx+px, my+py);
+    if (!c.one_way) mkBadge(rev, revDir, mx-px, my-py);
 
     svgLayer.appendChild(g);
 
@@ -1108,7 +1110,16 @@ const S = 260; // card size in world px
     } else {
       hit.style.cssText = `position:absolute;left:${mx-18}px;top:${Math.min(y1,y2)}px;width:36px;height:${Math.abs(dy)}px;cursor:pointer;pointer-events:all;`;
     }
-    hit.title = 'Double-click to delete link';
+    hit.title = 'Double-click to delete · Right-click to toggle one-way';
+    hit.addEventListener('contextmenu', e => {
+      e.preventDefault(); e.stopPropagation();
+      const conn = conns.find(x => x.id === c.id);
+      if (!conn) return;
+      conn.one_way = !conn.one_way;
+      sb.from('connectors').update({ one_way: conn.one_way }).eq('id', conn.id);
+      redrawConns();
+      toast(conn.one_way ? 'Set to one-way' : 'Set to two-way');
+    });
     hit.addEventListener('dblclick', e => {
       e.stopPropagation();
       if (confirm('Delete this link?')) {
