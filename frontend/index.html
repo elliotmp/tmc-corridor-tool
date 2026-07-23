@@ -606,7 +606,7 @@ function addCard(data) {
     const onMove = mv => {
       const angle = Math.atan2(mv.clientY - cy, mv.clientX - cx) * 180 / Math.PI;
       const raw = startRot + angle - startAngle;
-      data.rotation = Math.max(0, Math.min(90, raw));
+      data.rotation = Math.max(-90, Math.min(90, raw));
       applyRot(data.rotation);
       redrawConns();
     };
