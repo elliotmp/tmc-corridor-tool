@@ -1246,8 +1246,8 @@ document.addEventListener('mouseup', async e => {
     const {id}=dragging, el=cards[id]?.el;
     const x=parseFloat(el.style.left), y=parseFloat(el.style.top);
     dragging=null;
-    const { am_volumes, pm_volumes } = cards[id]?.data || {};
-    await sb.from('intersections').update({x, y, am_volumes, pm_volumes}).eq('id',id);
+    const { am_volumes, pm_volumes, rotation } = cards[id]?.data || {};
+    await sb.from('intersections').update({x, y, am_volumes, pm_volumes, rotation: rotation || 0}).eq('id',id);
   }
 });
 
@@ -1303,6 +1303,7 @@ async function saveAll() {
     sb.from('intersections').update({
       am_volumes: data.am_volumes, pm_volumes: data.pm_volumes,
       x: parseFloat(cards[data.id].el.style.left), y: parseFloat(cards[data.id].el.style.top),
+      rotation: data.rotation || 0,
     }).eq('id', data.id)
   ));
   btn.textContent = '✓ Saved'; btn.disabled = false;
