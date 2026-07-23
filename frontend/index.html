@@ -198,6 +198,7 @@
     <label style="display:flex;align-items:center;gap:4px;cursor:pointer"><input type="checkbox" id="tol-exact" /> Exact</label>
   </div>
   <div class="sep"></div>
+  <button id="conn-display-btn" onclick="toggleConnDisplay()" title="Toggle connector label">Δ Delta</button>
   <button onclick="fitView()">Fit</button>
   <button onclick="openAddInt()">+ Intersection</button>
   <button id="undo-btn" onclick="undo()" disabled title="Undo (Ctrl+Z)">↩ Undo</button>
@@ -365,6 +366,16 @@ function isOk(delta) {
   const pct = delta.dep > 0 ? Math.abs(delta.diff) / ((delta.dep + delta.arr) / 2) * 100 : 0;
   return pct <= tol;
 }
+
+let connDisplay = localStorage.getItem('conn-display') || 'delta'; // 'delta' | 'volume'
+function toggleConnDisplay() {
+  connDisplay = connDisplay === 'delta' ? 'volume' : 'delta';
+  localStorage.setItem('conn-display', connDisplay);
+  document.getElementById('conn-display-btn').textContent = connDisplay === 'delta' ? 'Δ Delta' : '# Volume';
+  redrawConns();
+}
+// init button label
+document.getElementById('conn-display-btn').textContent = connDisplay === 'delta' ? 'Δ Delta' : '# Volume';
 
 // persist tolerance settings
 const tolInput = document.getElementById('tol-input');
@@ -1080,7 +1091,9 @@ const S = 260; // card size in world px
       const bc = ok ? '#22c55e' : '#ef4444';
       const arrow = DIR_ARROW[dir] || '';
       const sign = delta.diff > 0 ? '+' : '';
-      const label = ok ? `${arrow} ✓` : `${arrow} ${sign}${delta.diff}`;
+      const label = connDisplay === 'volume'
+        ? `${arrow} ${delta.dep}`
+        : (ok ? `${arrow} ✓` : `${arrow} ${sign}${delta.diff}`);
       const w = 72, h = 22;
       const r=document.createElementNS(ns,'rect');
       r.setAttribute('x',lx-w/2); r.setAttribute('y',ly-h/2);
