@@ -604,9 +604,10 @@ function addCard(data) {
     let startRot = prevRot;
 
     const onMove = mv => {
-      const angle = Math.atan2(mv.clientY - cy, mv.clientX - cx) * 180 / Math.PI;
-      const raw = startRot + angle - startAngle;
-      data.rotation = Math.max(-90, Math.min(90, raw));
+      let diff = Math.atan2(mv.clientY - cy, mv.clientX - cx) * 180 / Math.PI - startAngle;
+      if (diff > 180) diff -= 360;
+      if (diff < -180) diff += 360;
+      data.rotation = Math.max(-90, Math.min(90, startRot + diff));
       applyRot(data.rotation);
       redrawConns();
     };
