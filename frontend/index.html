@@ -1071,15 +1071,14 @@ const S = 260; // card size in world px
   connHits.innerHTML = '';
   const ns = 'http://www.w3.org/2000/svg';
 
-  // convert screen coords to world coords
-  const wrapRect = wrap.getBoundingClientRect();
-  const screenToWorld = (sx, sy) => [(sx - wrapRect.left - tx) / scale, (sy - wrapRect.top - ty) / scale];
-
-  const portWorldPos = (cardEl, side) => {
-    const portEl = cardEl.querySelector(`.port[data-side="${side}"]`);
-    if (!portEl) return null;
-    const r = portEl.getBoundingClientRect();
-    return screenToWorld(r.left + r.width/2, r.top + r.height/2);
+  const portPos = (cardEl, cardData, side) => {
+    const bx = parseFloat(cardEl.style.left), by = parseFloat(cardEl.style.top);
+    const cx = bx+S/2, cy = by+S/2;
+    const raw = { right:[S/2,0], left:[-S/2,0], top:[0,-S/2], bottom:[0,S/2] }[side];
+    if (!raw) return null;
+    const rot = (cardData.rotation || 0) * Math.PI / 180;
+    const cos = Math.cos(rot), sin = Math.sin(rot);
+    return [cx + cos*raw[0] - sin*raw[1], cy + sin*raw[0] + cos*raw[1]];
   };
 
   conns.forEach(c => {
@@ -1088,13 +1087,13 @@ const S = 260; // card size in world px
     const dirToSide = { eb:'right', wb:'left', nb:'top', sb:'bottom' };
     const fromSide = c.from_side || dirToSide[c.direction] || 'right';
     const toSide   = c.to_side   || dirToSide[REVERSE[c.direction]] || 'left';
-    const fp = portWorldPos(fc.el, fromSide);
-    const tp = portWorldPos(tc.el, toSide);
+    const fp = portPos(fc.el, fc.data, fromSide);
+    const tp = portPos(tc.el, tc.data, toSide);
     if (!fp || !tp) return;
     let x1=fp[0], y1=fp[1], x2=tp[0], y2=tp[1];
     const dx=x2-x1, dy=y2-y1, len=Math.sqrt(dx*dx+dy*dy)||1;
-    const OFF = 40;
-    const px=-dy/len*OFF, py=dx/len*OFF; // perpendicular offset
+    const OFF = c.one_way ? 0 : 10; // no offset for one-way, small offset for two-way
+    const px=-dy/len*OFF, py=dx/len*OFF;
     const mx=(x1+x2)/2, my=(y1+y2)/2;
     const depDir    = SIDE_DIR[c.from_side] || c.direction;
     const revDir    = REVERSE[depDir];
@@ -1125,7 +1124,7 @@ const S = 260; // card size in world px
       g.appendChild(l2);
     }
 
-    // Center divider dash
+    // Center divider dash (two-way only)
     const cDiv = document.createElementNS(ns,'line');
     cDiv.setAttribute('x1',x1); cDiv.setAttribute('y1',y1);
     cDiv.setAttribute('x2',x2); cDiv.setAttribute('y2',y2);
@@ -1159,9 +1158,11 @@ const S = 260; // card size in world px
       t.textContent=label;
       g.appendChild(t);
     };
-    // fwd badge on line 1 (offset +), rev badge on line 2 (offset -)
-    mkBadge(fwd, depDir, mx+px, my+py);
-    if (!c.one_way) mkBadge(rev, revDir, mx-px, my-py);
+    // badges — one-way sits on the line, two-way offset further so they don't overlap
+    const BADGE_OFF = c.one_way ? 0 : 36;
+    const bpx = -dy/len*BADGE_OFF, bpy = dx/len*BADGE_OFF;
+    mkBadge(fwd, depDir, mx+bpx, my+bpy);
+    if (!c.one_way) mkBadge(rev, revDir, mx-bpx, my-bpy);
 
     svgLayer.appendChild(g);
 
@@ -1234,6 +1235,7 @@ document.addEventListener('mousemove', e => {
   if (dragging) {
     const dx=(e.clientX-dragging.sx)/scale, dy=(e.clientY-dragging.sy)/scale;
     const el=cards[dragging.id]?.el; if(el){el.style.left=(dragging.cx+dx)+'px';el.style.top=(dragging.cy+dy)+'px';}
+    redrawConns();
     redrawConns();
   }
 });
