@@ -1040,7 +1040,7 @@ const S = 260; // card size in world px
     const arrDir    = REVERSE[SIDE_DIR[c.to_side]] || revDir;
     const revDepDir = SIDE_DIR[c.to_side]  || revDir;
     const fwd = calcDelta(fc.data, tc.data, depDir,    arrDir);
-    const rev = calcDelta(tc.data, fc.data, revDepDir, REVERSE[arrDir]);
+    const rev = calcDelta(tc.data, fc.data, revDepDir, revDir);
 
     const lineColor = (delta) => isOk(delta) ? '#22c55e' : '#ef4444';
 
