@@ -90,6 +90,9 @@
   .card:hover .card-edit-btn { opacity: 1; }
   .card-del-btn { position: absolute; top: -14px; left: -14px; width: 36px; height: 36px; border-radius: 50%; background: #991b1b; border: 2px solid var(--bg); color: white; font-size: 22px; line-height: 1; display: flex; align-items: center; justify-content: center; cursor: pointer; opacity: 0; transition: opacity .15s; pointer-events: all; z-index: 20; }
   .card:hover .card-del-btn { opacity: 1; }
+  .card-rot-btn { position: absolute; bottom: -14px; right: -14px; width: 36px; height: 36px; border-radius: 50%; background: #2d4a2d; border: 2px solid var(--bg); color: white; font-size: 18px; display: flex; align-items: center; justify-content: center; cursor: pointer; opacity: 0; transition: opacity .15s; pointer-events: all; z-index: 20; }
+  .card:hover .card-rot-btn { opacity: 1; }
+  .svgholder { transition: transform .2s; transform-origin: center center; }
 
   /* Inline SVG volume editing */
   #svg-inline-input {
@@ -569,6 +572,7 @@ function addCard(data) {
     <div class="card-label" title="Double-click to rename">#${esc(data.int_id)} &mdash; ${esc(data.ns_street)} &amp; ${esc(data.ew_street)}</div>
     <button class="card-edit-btn" title="Edit volumes" onclick="event.stopPropagation();openEdit('${data.id}')">✏</button>
     <button class="card-del-btn" title="Delete intersection" onclick="event.stopPropagation();deleteIntersection('${data.id}')">×</button>
+    <button class="card-rot-btn" title="Rotate diagram">↻</button>
     <div class="port" data-card="${data.id}" data-side="top"></div>
     <div class="port" data-card="${data.id}" data-side="right"></div>
     <div class="port" data-card="${data.id}" data-side="bottom"></div>
@@ -581,6 +585,16 @@ function addCard(data) {
     e.preventDefault();
     dragging = { id: data.id, sx: e.clientX, sy: e.clientY, cx: parseFloat(el.style.left), cy: parseFloat(el.style.top) };
   });
+  // apply stored rotation
+  if (data.rotation) el.querySelector('.svgholder').style.transform = `rotate(${data.rotation}deg)`;
+
+  el.querySelector('.card-rot-btn').addEventListener('click', e => {
+    e.stopPropagation();
+    data.rotation = ((data.rotation || 0) + 90) % 360;
+    el.querySelector('.svgholder').style.transform = `rotate(${data.rotation}deg)`;
+    sb.from('intersections').update({ rotation: data.rotation }).eq('id', data.id);
+  });
+
   el.querySelector('.card-label').addEventListener('dblclick', e => {
     e.stopPropagation();
     openRenameInt(data.id);
