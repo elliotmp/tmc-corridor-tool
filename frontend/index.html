@@ -629,16 +629,18 @@ function addCard(data) {
       let diff = Math.atan2(mv.clientY - cy, mv.clientX - cx) * 180 / Math.PI - startAngle;
       if (diff > 180) diff -= 360;
       if (diff < -180) diff += 360;
-      data.rotation = Math.max(-90, Math.min(90, startRot + diff));
-      applyRot(data.rotation);
+      const rot = Math.max(-90, Math.min(90, startRot + diff));
+      data.rotation = rot;
+      if (cards[data.id]) cards[data.id].data.rotation = rot; // keep portPos in sync
+      applyRot(rot);
       redrawConns();
     };
-    const onUp = () => {
+    const onUp = async () => {
       document.removeEventListener('mousemove', onMove);
       document.removeEventListener('mouseup', onUp);
       rotatingCardId = null;
       const finalRot = Math.round(data.rotation);
-      sb.from('intersections').update({ rotation: finalRot }).eq('id', data.id);
+      await sb.from('intersections').update({ rotation: finalRot }).eq('id', data.id);
       pushUndo(async () => {
         data.rotation = prevRot;
         applyRot(prevRot);
@@ -1198,13 +1200,13 @@ const S = 260; // card size in world px
       hit.style.cssText = `position:absolute;left:${mx-18}px;top:${Math.min(y1,y2)}px;width:36px;height:${Math.abs(dy)}px;cursor:pointer;pointer-events:all;`;
     }
     hit.title = 'Double-click to delete · Right-click to toggle one-way';
-    hit.addEventListener('contextmenu', e => {
+    hit.addEventListener('contextmenu', async e => {
       e.preventDefault(); e.stopPropagation();
       const conn = conns.find(x => x.id === c.id);
       if (!conn) return;
       const prev = conn.one_way;
       conn.one_way = !conn.one_way;
-      sb.from('connectors').update({ one_way: conn.one_way }).eq('id', conn.id);
+      await sb.from('connectors').update({ one_way: conn.one_way }).eq('id', conn.id);
       redrawConns();
       toast(conn.one_way ? 'Set to one-way' : 'Set to two-way');
       pushUndo(async () => {
