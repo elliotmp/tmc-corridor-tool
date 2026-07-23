@@ -1071,26 +1071,25 @@ const S = 260; // card size in world px
   connHits.innerHTML = '';
   const ns = 'http://www.w3.org/2000/svg';
 
+  // convert screen coords to world coords
+  const wrapRect = wrap.getBoundingClientRect();
+  const screenToWorld = (sx, sy) => [(sx - wrapRect.left - tx) / scale, (sy - wrapRect.top - ty) / scale];
+
+  const portWorldPos = (cardEl, side) => {
+    const portEl = cardEl.querySelector(`.port[data-side="${side}"]`);
+    if (!portEl) return null;
+    const r = portEl.getBoundingClientRect();
+    return screenToWorld(r.left + r.width/2, r.top + r.height/2);
+  };
+
   conns.forEach(c => {
     const fc = cards[c.from_intersection_id], tc = cards[c.to_intersection_id];
     if (!fc || !tc) return;
-    const fx = parseFloat(fc.el.style.left), fy = parseFloat(fc.el.style.top);
-    const tx2= parseFloat(tc.el.style.left), ty2= parseFloat(tc.el.style.top);
     const dirToSide = { eb:'right', wb:'left', nb:'top', sb:'bottom' };
-    const sidePos = (bx, by, side, rot) => {
-      const cx = bx+S/2, cy = by+S/2;
-      const raw = { right:[bx+S,by+S/2], left:[bx,by+S/2], top:[bx+S/2,by], bottom:[bx+S/2,by+S] }[side];
-      if (!raw) return null;
-      if (!rot) return raw;
-      const rad = rot * Math.PI / 180;
-      const cos = Math.cos(rad), sin = Math.sin(rad);
-      const dx = raw[0]-cx, dy = raw[1]-cy;
-      return [cx + cos*dx - sin*dy, cy + sin*dx + cos*dy];
-    };
     const fromSide = c.from_side || dirToSide[c.direction] || 'right';
     const toSide   = c.to_side   || dirToSide[REVERSE[c.direction]] || 'left';
-    const fp = sidePos(fx, fy, fromSide, fc.data.rotation || 0);
-    const tp = sidePos(tx2, ty2, toSide, tc.data.rotation || 0);
+    const fp = portWorldPos(fc.el, fromSide);
+    const tp = portWorldPos(tc.el, toSide);
     if (!fp || !tp) return;
     let x1=fp[0], y1=fp[1], x2=tp[0], y2=tp[1];
     const dx=x2-x1, dy=y2-y1, len=Math.sqrt(dx*dx+dy*dy)||1;
