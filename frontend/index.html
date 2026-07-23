@@ -587,9 +587,12 @@ function addCard(data) {
     dragging = { id: data.id, sx: e.clientX, sy: e.clientY, cx: parseFloat(el.style.left), cy: parseFloat(el.style.top) };
   });
 
-  // apply stored rotation
-  const svgHolder = el.querySelector('.svgholder');
-  if (data.rotation) svgHolder.style.transform = `rotate(${data.rotation}deg)`;
+  // apply stored rotation to whole card
+  const applyRot = rot => {
+    el.style.transform = rot ? `rotate(${rot}deg)` : '';
+    el.style.transformOrigin = 'center center';
+  };
+  applyRot(data.rotation || 0);
 
   el.querySelector('.card-rot-btn').addEventListener('mousedown', e => {
     e.stopPropagation(); e.preventDefault();
@@ -597,17 +600,28 @@ function addCard(data) {
     const cx = rect.left + rect.width / 2;
     const cy = rect.top  + rect.height / 2;
     const startAngle = Math.atan2(e.clientY - cy, e.clientX - cx) * 180 / Math.PI;
-    const startRot   = data.rotation || 0;
+    const prevRot = data.rotation || 0;
+    let startRot = prevRot;
 
     const onMove = mv => {
       const angle = Math.atan2(mv.clientY - cy, mv.clientX - cx) * 180 / Math.PI;
-      data.rotation = (startRot + angle - startAngle + 360) % 360;
-      svgHolder.style.transform = `rotate(${data.rotation}deg)`;
+      const raw = startRot + angle - startAngle;
+      data.rotation = Math.max(0, Math.min(90, raw));
+      applyRot(data.rotation);
+      redrawConns();
     };
     const onUp = () => {
       document.removeEventListener('mousemove', onMove);
       document.removeEventListener('mouseup', onUp);
-      sb.from('intersections').update({ rotation: Math.round(data.rotation) }).eq('id', data.id);
+      const finalRot = Math.round(data.rotation);
+      sb.from('intersections').update({ rotation: finalRot }).eq('id', data.id);
+      pushUndo(async () => {
+        data.rotation = prevRot;
+        applyRot(prevRot);
+        redrawConns();
+        await sb.from('intersections').update({ rotation: prevRot }).eq('id', data.id);
+        toast('Undo: rotation restored');
+      });
     };
     document.addEventListener('mousemove', onMove);
     document.addEventListener('mouseup', onUp);
@@ -1062,16 +1076,20 @@ const S = 260; // card size in world px
     const fx = parseFloat(fc.el.style.left), fy = parseFloat(fc.el.style.top);
     const tx2= parseFloat(tc.el.style.left), ty2= parseFloat(tc.el.style.top);
     const dirToSide = { eb:'right', wb:'left', nb:'top', sb:'bottom' };
-    const sidePos = (bx, by, side) => ({
-      right:  [bx+S, by+S/2],
-      left:   [bx,   by+S/2],
-      top:    [bx+S/2, by],
-      bottom: [bx+S/2, by+S],
-    }[side]);
+    const sidePos = (bx, by, side, rot) => {
+      const cx = bx+S/2, cy = by+S/2;
+      const raw = { right:[bx+S,by+S/2], left:[bx,by+S/2], top:[bx+S/2,by], bottom:[bx+S/2,by+S] }[side];
+      if (!raw) return null;
+      if (!rot) return raw;
+      const rad = rot * Math.PI / 180;
+      const cos = Math.cos(rad), sin = Math.sin(rad);
+      const dx = raw[0]-cx, dy = raw[1]-cy;
+      return [cx + cos*dx - sin*dy, cy + sin*dx + cos*dy];
+    };
     const fromSide = c.from_side || dirToSide[c.direction] || 'right';
     const toSide   = c.to_side   || dirToSide[REVERSE[c.direction]] || 'left';
-    const fp = sidePos(fx, fy, fromSide);
-    const tp = sidePos(tx2, ty2, toSide);
+    const fp = sidePos(fx, fy, fromSide, fc.data.rotation || 0);
+    const tp = sidePos(tx2, ty2, toSide, tc.data.rotation || 0);
     if (!fp || !tp) return;
     let x1=fp[0], y1=fp[1], x2=tp[0], y2=tp[1];
     const dx=x2-x1, dy=y2-y1, len=Math.sqrt(dx*dx+dy*dy)||1;
@@ -1160,10 +1178,17 @@ const S = 260; // card size in world px
       e.preventDefault(); e.stopPropagation();
       const conn = conns.find(x => x.id === c.id);
       if (!conn) return;
+      const prev = conn.one_way;
       conn.one_way = !conn.one_way;
       sb.from('connectors').update({ one_way: conn.one_way }).eq('id', conn.id);
       redrawConns();
       toast(conn.one_way ? 'Set to one-way' : 'Set to two-way');
+      pushUndo(async () => {
+        conn.one_way = prev;
+        await sb.from('connectors').update({ one_way: prev }).eq('id', conn.id);
+        redrawConns();
+        toast('Undo: connector direction restored');
+      });
     });
     hit.addEventListener('dblclick', e => {
       e.stopPropagation();
