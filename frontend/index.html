@@ -1043,7 +1043,7 @@ const S = 260; // card size in world px
     if (!fp || !tp) return;
     let x1=fp[0], y1=fp[1], x2=tp[0], y2=tp[1];
     const dx=x2-x1, dy=y2-y1, len=Math.sqrt(dx*dx+dy*dy)||1;
-    const OFF = 22;
+    const OFF = 40;
     const px=-dy/len*OFF, py=dx/len*OFF; // perpendicular offset
     const mx=(x1+x2)/2, my=(y1+y2)/2;
     const depDir    = SIDE_DIR[c.from_side] || c.direction;
