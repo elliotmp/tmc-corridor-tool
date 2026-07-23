@@ -371,6 +371,7 @@ function isOk(delta) {
 }
 
 let connDisplay = localStorage.getItem('conn-display') || 'delta'; // 'delta' | 'volume'
+let rotatingCardId = null; // card currently being rotation-dragged — block realtime resets
 function toggleConnDisplay() {
   connDisplay = connDisplay === 'delta' ? 'volume' : 'delta';
   localStorage.setItem('conn-display', connDisplay);
@@ -603,6 +604,7 @@ function addCard(data) {
     const prevRot = data.rotation || 0;
     let startRot = prevRot;
 
+    rotatingCardId = data.id;
     const onMove = mv => {
       let diff = Math.atan2(mv.clientY - cy, mv.clientX - cx) * 180 / Math.PI - startAngle;
       if (diff > 180) diff -= 360;
@@ -614,6 +616,7 @@ function addCard(data) {
     const onUp = () => {
       document.removeEventListener('mousemove', onMove);
       document.removeEventListener('mouseup', onUp);
+      rotatingCardId = null;
       const finalRot = Math.round(data.rotation);
       sb.from('intersections').update({ rotation: finalRot }).eq('id', data.id);
       pushUndo(async () => {
@@ -1558,6 +1561,8 @@ function subscribeRealtime() {
 }
 function handleIntChange({eventType,new:n,old:o}) {
   if(eventType==='UPDATE'&&cards[n.id]){
+    // Don't let a realtime event interrupt an active rotation drag
+    if (rotatingCardId === n.id) return;
     cards[n.id].el.style.left=n.x+'px'; cards[n.id].el.style.top=n.y+'px';
     const { am_volumes, pm_volumes, ...rest } = n;
     cards[n.id].data = { ...cards[n.id].data, ...rest };
