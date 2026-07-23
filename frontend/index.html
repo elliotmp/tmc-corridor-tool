@@ -582,17 +582,35 @@ function addCard(data) {
   el.addEventListener('mousedown', e => {
     if (e.target.classList.contains('port')) { startConnDrag(e, data.id, e.target.dataset.side); return; }
     if (e.target.closest('.card-edit-btn')) return;
+    if (e.target.closest('.card-rot-btn')) return;
     e.preventDefault();
     dragging = { id: data.id, sx: e.clientX, sy: e.clientY, cx: parseFloat(el.style.left), cy: parseFloat(el.style.top) };
   });
-  // apply stored rotation
-  if (data.rotation) el.querySelector('.svgholder').style.transform = `rotate(${data.rotation}deg)`;
 
-  el.querySelector('.card-rot-btn').addEventListener('click', e => {
-    e.stopPropagation();
-    data.rotation = ((data.rotation || 0) + 90) % 360;
-    el.querySelector('.svgholder').style.transform = `rotate(${data.rotation}deg)`;
-    sb.from('intersections').update({ rotation: data.rotation }).eq('id', data.id);
+  // apply stored rotation
+  const svgHolder = el.querySelector('.svgholder');
+  if (data.rotation) svgHolder.style.transform = `rotate(${data.rotation}deg)`;
+
+  el.querySelector('.card-rot-btn').addEventListener('mousedown', e => {
+    e.stopPropagation(); e.preventDefault();
+    const rect = el.getBoundingClientRect();
+    const cx = rect.left + rect.width / 2;
+    const cy = rect.top  + rect.height / 2;
+    const startAngle = Math.atan2(e.clientY - cy, e.clientX - cx) * 180 / Math.PI;
+    const startRot   = data.rotation || 0;
+
+    const onMove = mv => {
+      const angle = Math.atan2(mv.clientY - cy, mv.clientX - cx) * 180 / Math.PI;
+      data.rotation = (startRot + angle - startAngle + 360) % 360;
+      svgHolder.style.transform = `rotate(${data.rotation}deg)`;
+    };
+    const onUp = () => {
+      document.removeEventListener('mousemove', onMove);
+      document.removeEventListener('mouseup', onUp);
+      sb.from('intersections').update({ rotation: Math.round(data.rotation) }).eq('id', data.id);
+    };
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup', onUp);
   });
 
   el.querySelector('.card-label').addEventListener('dblclick', e => {
