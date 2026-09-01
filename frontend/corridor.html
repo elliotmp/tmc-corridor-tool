@@ -1,0 +1,1791 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TMC Corridor Tool</title>
+<style>
+  :root {
+    --bg: #1a1a2e; --surface: #16213e; --surface2: #0f3460;
+    --accent: #e94560; --text: #eaeaea; --muted: #8892a4;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: var(--text); height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
+
+  /* ── Topbar ── */
+  #topbar { display: flex; align-items: center; gap: 10px; padding: 7px 14px; background: var(--surface); border-bottom: 1px solid #2a2a4a; flex-shrink: 0; flex-wrap: wrap; }
+  #topbar h1 { font-size: 14px; font-weight: 700; color: var(--accent); white-space: nowrap; letter-spacing: .5px; }
+  .sep { width: 1px; height: 22px; background: #2a2a4a; }
+  .export-wrap { position: relative; }
+  .export-wrap .export-menu { display: none; position: absolute; top: calc(100% + 4px); right: 0; background: var(--surface2); border: 1px solid #2a2a4a; border-radius: 6px; min-width: 140px; z-index: 500; overflow: hidden; }
+  .export-wrap.open .export-menu { display: block; }
+  .export-menu button { display: block; width: 100%; text-align: left; border: none; border-radius: 0; padding: 8px 14px; font-size: 12px; }
+  .export-menu button:hover { background: #2a2a4a; }
+  button, select, input[type=number], input[type=text] {
+    background: var(--surface2); color: var(--text); border: 1px solid #2a2a4a;
+    border-radius: 5px; padding: 5px 10px; font-size: 12px; cursor: pointer; font-family: inherit;
+  }
+  button:hover { background: #1a4a80; border-color: #4a6aaa; }
+  .btn-accent { background: var(--accent); border-color: var(--accent); font-weight: 600; }
+  .btn-accent:hover { background: #c73350; border-color: #c73350; }
+  .seg { display: flex; }
+  .seg button { border-radius: 0; border-right-width: 0; padding: 5px 14px; }
+  .seg button:first-child { border-radius: 5px 0 0 5px; }
+  .seg button:last-child  { border-radius: 0 5px 5px 0; border-right-width: 1px; }
+  .seg button.on { background: #1e5aaa; border-color: #5a8adf; color: #a0c8ff; font-weight: 700; }
+  #proj-label { font-size: 12px; color: var(--muted); max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  #tol-wrap { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); }
+  #tol-input { width: 52px; padding: 5px 6px; text-align: center; }
+
+  /* ── Overlays ── */
+  .overlay { position: fixed; inset: 0; background: rgba(0,0,0,.75); display: flex; align-items: center; justify-content: center; z-index: 500; }
+  .box { background: var(--surface); border: 1px solid #2a2a4a; border-radius: 10px; padding: 28px 30px; display: flex; flex-direction: column; gap: 14px; min-width: 380px; max-width: 480px; }
+  .box h2 { font-size: 15px; font-weight: 700; }
+  .box input[type=text], .box input[type=file] { background: var(--bg); border: 1px solid #2a2a4a; border-radius: 6px; color: var(--text); padding: 8px 10px; font-size: 13px; font-family: inherit; width: 100%; }
+  .box input[type=file] { padding: 6px; border-style: dashed; cursor: pointer; }
+  .field { display: flex; flex-direction: column; gap: 5px; }
+  .field label { font-size: 11px; color: var(--muted); font-weight: 600; text-transform: uppercase; letter-spacing: .5px; }
+  .row { display: flex; gap: 8px; }
+  #proj-list { display: flex; flex-direction: column; gap: 3px; max-height: 360px; overflow-y: auto; }
+  .proj-item { display: flex; align-items: center; background: var(--surface2); border: 1px solid #2a2a4a; border-radius: 7px; padding: 8px 10px; cursor: pointer; gap: 6px; }
+  .proj-item:hover { border-color: #5a8adf; }
+  .proj-item b { font-size: 13px; display: block; }
+  .proj-item small { color: var(--muted); font-size: 11px; }
+  .proj-del { background: transparent !important; border: none !important; color: #ef4444; font-size: 18px; padding: 0 4px; opacity: .6; line-height: 1; }
+  .proj-del:hover { opacity: 1; background: transparent !important; }
+  .folder-item { display: flex; align-items: center; gap: 5px; padding: 5px 8px; border-radius: 6px; cursor: pointer; user-select: none; }
+  .folder-item:hover { background: var(--surface2); }
+  .folder-chevron { font-size: 10px; width: 12px; flex-shrink: 0; color: var(--muted); }
+  .folder-icon { font-size: 13px; flex-shrink: 0; }
+  .folder-name { font-size: 13px; font-weight: 600; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .folder-actions { display: flex; gap: 2px; opacity: 0; flex-shrink: 0; }
+  .folder-item:hover .folder-actions { opacity: 1; }
+  .fld-btn { background: transparent; border: none; color: var(--muted); font-size: 13px; padding: 1px 5px; border-radius: 4px; cursor: pointer; line-height: 1.4; }
+  .fld-btn:hover { color: var(--text); background: #2a2a4a; }
+  .fld-btn.fld-del:hover { color: #ef4444; }
+  #upload-status { font-size: 12px; color: var(--muted); min-height: 18px; }
+
+  /* ── Edit drawer ── */
+  #edit-drawer {
+    position: fixed; top: 0; right: -380px; width: 360px; height: 100vh;
+    background: var(--surface); border-left: 1px solid #2a2a4a;
+    display: flex; flex-direction: column;
+    transition: right .25s ease; z-index: 400; overflow: hidden;
+  }
+  #edit-drawer.open { right: 0; }
+  #edit-header { display: flex; align-items: center; justify-content: space-between; padding: 14px 16px; border-bottom: 1px solid #2a2a4a; flex-shrink: 0; }
+  #edit-title { font-size: 13px; font-weight: 700; }
+  #edit-close { background: transparent; border: none; color: var(--muted); font-size: 20px; cursor: pointer; padding: 0; line-height: 1; }
+  #edit-close:hover { color: var(--text); background: transparent; }
+  #edit-body { flex: 1; overflow-y: auto; padding: 14px 16px; display: flex; flex-direction: column; gap: 12px; }
+  .edit-section-label { font-size: 10px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .8px; margin-top: 4px; }
+  .edit-grid { display: grid; grid-template-columns: 80px 1fr 1fr; gap: 6px; align-items: center; }
+  .edit-grid .hdr { font-size: 10px; color: var(--muted); font-weight: 600; text-align: center; }
+  .edit-grid .flabel { font-size: 12px; color: var(--text); }
+  .edit-grid input { background: var(--bg); border: 1px solid #2a2a4a; border-radius: 4px; color: var(--text); padding: 4px 7px; font-size: 12px; font-family: inherit; width: 100%; text-align: right; }
+  .edit-grid input:focus { outline: none; border-color: #5a8adf; }
+  .edit-grid input.changed { border-color: #f97316; }
+  #edit-footer { padding: 12px 16px; border-top: 1px solid #2a2a4a; display: flex; gap: 8px; flex-shrink: 0; }
+
+  /* ── Canvas ── */
+  #canvas-wrap { flex: 1; position: relative; overflow: hidden; cursor: default; }
+  #canvas-wrap.panning { cursor: grabbing; }
+  #canvas-wrap.connecting { cursor: crosshair; }
+  #world { position: absolute; top: 0; left: 0; transform-origin: 0 0; }
+  #svg-layer { position: absolute; top: 0; left: 0; pointer-events: none; overflow: visible; }
+
+  /* ── Cards ── */
+  .card { position: absolute; width: 260px; height: 260px; border-radius: 8px; overflow: visible; user-select: none; cursor: grab; }
+  .card:active { cursor: grabbing; }
+  .card-inner { width: 100%; height: 100%; border-radius: 8px; overflow: hidden; background: #fff; box-shadow: 0 3px 16px rgba(0,0,0,.5); }
+  .card-inner svg { width: 100%; height: 100%; display: block; }
+  .card-label { position: absolute; bottom: -24px; left: 50%; transform: translateX(-50%); text-align: center; font-size: 10px; color: var(--muted); white-space: nowrap; pointer-events: none; transition: font-size .15s, color .15s, bottom .15s; }
+  .card:hover .card-label { font-size: 15px; color: var(--text); bottom: -30px; }
+  .card-edit-btn { position: absolute; top: -14px; right: -14px; width: 36px; height: 36px; border-radius: 50%; background: #1e5aaa; border: 2px solid var(--bg); color: white; font-size: 20px; display: flex; align-items: center; justify-content: center; cursor: pointer; opacity: 0; transition: opacity .15s; pointer-events: all; z-index: 20; }
+  .card:hover .card-edit-btn { opacity: 1; }
+  .card-del-btn { position: absolute; top: -14px; left: -14px; width: 36px; height: 36px; border-radius: 50%; background: #991b1b; border: 2px solid var(--bg); color: white; font-size: 22px; line-height: 1; display: flex; align-items: center; justify-content: center; cursor: pointer; opacity: 0; transition: opacity .15s; pointer-events: all; z-index: 20; }
+  .card:hover .card-del-btn { opacity: 1; }
+  .card-rot-btn { position: absolute; bottom: -14px; right: -14px; width: 36px; height: 36px; border-radius: 50%; background: #2d4a2d; border: 2px solid var(--bg); color: white; font-size: 18px; display: flex; align-items: center; justify-content: center; cursor: pointer; opacity: 0; transition: opacity .15s; pointer-events: all; z-index: 20; }
+  .card:hover .card-rot-btn { opacity: 1; }
+  .svgholder { transition: transform .2s; transform-origin: center center; }
+
+  /* Inline SVG volume editing */
+  #svg-inline-input {
+    position: fixed; z-index: 9999; display: none;
+    width: 60px; padding: 2px 4px; font-size: 12px; font-weight: 600;
+    border: 2px solid #3b82f6; border-radius: 4px;
+    background: #fff; color: #111; text-align: center;
+    box-shadow: 0 2px 8px rgba(0,0,0,.4);
+  }
+  .svgholder text[data-field] { cursor: pointer; }
+  .svgholder text[data-field]:hover { opacity: 0.7; }
+
+  /* Ports */
+  .port { position: absolute; width: 16px; height: 16px; border-radius: 50%; background: #3b82f6; border: 2px solid #fff; transform: translate(-50%,-50%); opacity: 0; transition: opacity .15s; cursor: crosshair; pointer-events: all; z-index: 20; }
+  .card:hover .port { opacity: 1; }
+  .port.lit { opacity: 1 !important; background: #22c55e; }
+  .port.snap-lit { opacity: 1 !important; background: #f97316; }
+  .card.conn-hover { outline: 3px solid #f97316; }
+.port[data-side=top]    { top: 0;    left: 50%; }
+  .port[data-side=right]  { top: 50%;  left: 100%; }
+  .port[data-side=bottom] { top: 100%; left: 50%; }
+  .port[data-side=left]   { top: 50%;  left: 0; }
+
+
+  /* ── Empty state ── */
+  #empty { position: absolute; inset: 0; display: none; flex-direction: column; align-items: center; justify-content: center; gap: 12px; color: var(--muted); pointer-events: none; }
+  #empty p { font-size: 13px; }
+
+  /* ── Status bar ── */
+  #statusbar { display: flex; align-items: center; gap: 14px; padding: 3px 14px; background: var(--surface); border-top: 1px solid #2a2a4a; font-size: 11px; color: var(--muted); flex-shrink: 0; }
+  #status-zoom { min-width: 48px; }
+  #status-hint { margin-left: auto; }
+
+  /* ── Toast ── */
+  #toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%) translateY(50px); background: #1e3a5f; color: var(--text); padding: 8px 18px; border-radius: 7px; font-size: 12px; transition: transform .25s; z-index: 9999; pointer-events: none; border: 1px solid #3a6aaf; }
+  #toast.show { transform: translateX(-50%) translateY(0); }
+  .spinner { display: inline-block; width: 13px; height: 13px; border: 2px solid #3a3a5a; border-top-color: #5a8adf; border-radius: 50%; animation: spin .7s linear infinite; vertical-align: middle; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+</style>
+</head>
+<body>
+
+<!-- Project picker -->
+<div class="overlay" id="proj-overlay">
+  <div class="box" style="min-width:480px;max-width:560px">
+    <h2>TMC Corridor Tool</h2>
+    <div id="proj-list"><div style="color:var(--muted);font-size:12px;text-align:center;padding:12px">Loading…</div></div>
+    <div class="row" style="margin-top:4px">
+      <input type="text" id="new-proj-input" placeholder="New project name…" style="flex:1" />
+      <button class="btn-accent" onclick="createProject()">+ Project</button>
+      <button onclick="createFolder(null)" style="white-space:nowrap">+ Folder</button>
+    </div>
+  </div>
+</div>
+
+<!-- Move project overlay -->
+<div class="overlay" id="move-overlay" style="display:none">
+  <div class="box" style="min-width:340px">
+    <h2>Move Project</h2>
+    <div class="field">
+      <label>Destination Folder</label>
+      <select id="move-folder-sel" style="background:var(--bg);border:1px solid #2a2a4a;border-radius:6px;color:var(--text);padding:8px 10px;font-size:13px;font-family:inherit;width:100%"></select>
+    </div>
+    <div class="row" style="justify-content:flex-end">
+      <button onclick="document.getElementById('move-overlay').style.display='none'">Cancel</button>
+      <button class="btn-accent" onclick="confirmMoveProject()">Move</button>
+    </div>
+  </div>
+</div>
+
+<!-- Upload overlay -->
+<div class="overlay" id="upload-overlay" style="display:none">
+  <div class="box">
+    <h2>Upload Data</h2>
+    <div class="field"><label>Volume CSV</label><input type="file" id="csv-file" accept=".csv" /></div>
+    <div class="field" style="display:flex;gap:12px;align-items:center">
+      <label style="display:flex;align-items:center;gap:6px;cursor:pointer">
+        <input type="radio" name="upload-mode" value="replace" /> Full replace <small style="color:var(--muted)">(clears layout)</small>
+      </label>
+      <label style="display:flex;align-items:center;gap:6px;cursor:pointer">
+        <input type="radio" name="upload-mode" value="volumes" checked /> Update volumes only <small style="color:var(--muted)">(keeps layout &amp; connectors)</small>
+      </label>
+    </div>
+    <div id="upload-status"></div>
+    <div class="row" style="justify-content:flex-end">
+      <button onclick="closeUpload()">Cancel</button>
+      <button class="btn-accent" onclick="doUpload()">Process &amp; Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- Edit drawer -->
+<div id="edit-drawer">
+  <div id="edit-header">
+    <span id="edit-title">Edit Volumes</span>
+    <button id="edit-close" onclick="closeEdit()">×</button>
+  </div>
+  <div id="edit-body">
+    <!-- populated by openEdit() -->
+  </div>
+  <div id="edit-footer">
+    <button onclick="closeEdit()" style="flex:1">Cancel</button>
+    <button class="btn-accent" onclick="saveEdit()" style="flex:2">Save Changes</button>
+  </div>
+</div>
+
+<!-- Suite Nav -->
+<div id="suite-nav" style="display:flex;align-items:center;background:#0d0d1a;border-bottom:1px solid #1a1a2e;flex-shrink:0">
+  <span style="padding:5px 14px;color:#e94560;font-weight:700;font-size:12px;border-right:1px solid #1a1a2e;letter-spacing:.5px">TMC SUITE</span>
+  <a href="index.html" style="padding:5px 14px;color:#8892a4;text-decoration:none;font-size:12px;font-weight:600;border-bottom:2px solid transparent">← Home</a>
+  <a href="corridor.html" style="padding:5px 14px;color:#e94560;text-decoration:none;font-size:12px;font-weight:600;border-bottom:2px solid #e94560">Corridor</a>
+  <a href="tmc.html" style="padding:5px 14px;color:#8892a4;text-decoration:none;font-size:12px;font-weight:600;border-bottom:2px solid transparent">TMC Processor</a>
+</div>
+
+<!-- Topbar -->
+<div id="topbar">
+  <h1>TMC CORRIDOR</h1>
+  <div class="sep"></div>
+  <span id="proj-label">No project</span>
+  <button onclick="showProjPicker()">Projects</button>
+  <button onclick="openUpload()">Upload Data</button>
+  <div class="sep"></div>
+  <div class="seg">
+    <button id="btn-am" class="on" onclick="setScenario('am')">AM</button>
+    <button id="btn-pm"            onclick="setScenario('pm')">PM</button>
+  </div>
+  <div class="sep"></div>
+  <div id="tol-wrap">
+    Tolerance <input type="number" id="tol-input" min="0" max="50" step="1" title="Balance tolerance %" /> %
+    <label style="display:flex;align-items:center;gap:4px;cursor:pointer"><input type="checkbox" id="tol-exact" /> Exact</label>
+  </div>
+  <div class="sep"></div>
+  <button id="conn-display-btn" onclick="toggleConnDisplay()" title="Toggle connector label">Δ Delta</button>
+  <button onclick="fitView()">Fit</button>
+  <button onclick="openAddInt()">+ Intersection</button>
+  <button id="undo-btn" onclick="undo()" disabled title="Undo (Ctrl+Z)">↩ Undo</button>
+  <button onclick="saveAll()" id="save-btn">Save</button>
+  <div class="export-wrap" id="export-wrap">
+    <button onclick="toggleExportMenu()">Export ▾</button>
+    <div class="export-menu">
+      <button onclick="exportCSV();closeExportMenu()">CSV</button>
+      <button onclick="exportNetwork();closeExportMenu()">JSON</button>
+      <button onclick="exportSynchro();closeExportMenu()">Synchro</button>
+    </div>
+  </div>
+</div>
+
+<!-- Add Intersection overlay -->
+<div id="addint-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:600;display:none;align-items:center;justify-content:center">
+  <div class="box" style="min-width:340px">
+    <h2>Add Intersection</h2>
+    <div class="field"><label>Intersection ID</label><input type="text" id="ai-intid" placeholder="e.g. 5"></div>
+    <div class="field"><label>N/S Street</label><input type="text" id="ai-ns" placeholder="e.g. Main St"></div>
+    <div class="field"><label>E/W Street</label><input type="text" id="ai-ew" placeholder="e.g. 1st Ave"></div>
+    <div class="row">
+      <button class="btn-accent" style="flex:1" onclick="doAddInt()">Add</button>
+      <button onclick="document.getElementById('addint-overlay').style.display='none'">Cancel</button>
+    </div>
+  </div>
+</div>
+
+
+
+<!-- Inline SVG volume input -->
+<input id="svg-inline-input" type="number" min="0" />
+
+<!-- Canvas -->
+<div id="canvas-wrap">
+  <div id="world">
+    <svg id="svg-layer" width="8000" height="8000"></svg>
+    <div id="conn-hits" style="position:absolute;top:0;left:0;pointer-events:none"></div>
+  </div>
+  <div id="empty">
+    <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" style="opacity:.15"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="12" y1="3" x2="12" y2="21"/></svg>
+    <p>Upload a CSV to populate this project's intersections.</p>
+  </div>
+  <div id="del-btns" style="position:absolute;top:0;left:0;pointer-events:none"></div>
+</div>
+
+
+<!-- Status bar -->
+<div id="statusbar">
+  <span id="status-zoom">100%</span>
+  <span>|</span>
+  <span>Scroll = zoom &nbsp;·&nbsp; Alt+drag = pan &nbsp;·&nbsp; ✏️ = edit volumes</span>
+  <span id="status-hint"></span>
+</div>
+
+<div id="toast"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script>
+// ════════════════════════════════════════════════
+// INTERSECTION SVG GENERATOR
+// ════════════════════════════════════════════════
+
+function generateIntersectionSVG(vols, intId, nsStreet, ewStreet) {
+  const G = f => parseInt(vols?.[f] ?? 0);
+  const E = s => String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  const V = (x, y, f, anchor) =>
+    `<text x="${x}" y="${y}" data-field="${f}" fill="#ffffff" font-size="16" font-weight="700" font-family="'Courier New',monospace" text-anchor="${anchor}" stroke="#1a1a2e" stroke-width="6" paint-order="stroke fill">${G(f)}</text>`;
+  const ln = (x1,y1,x2,y2) => `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/>`;
+  const hd = (px,py,dir) => { const S=6; const pts=dir==='U'?`${px-S},${py+S} ${px},${py} ${px+S},${py+S}`:dir==='D'?`${px-S},${py-S} ${px},${py} ${px+S},${py-S}`:dir==='L'?`${px+S},${py-S} ${px},${py} ${px+S},${py+S}`:`${px-S},${py-S} ${px},${py} ${px-S},${py+S}`; return `<polyline points="${pts}" stroke="currentColor" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>`; };
+
+  const nby=214, nbf=280, nbm=247; // near, far, label-mid y for NB
+  const sby=86,  sbf=20,  sbm=53;  // near, far, label-mid y for SB
+  const ebx=86,  ebf=20,  ebm=53;  // near, far, label-mid x for EB
+  const wbx=214, wbf=280, wbm=247; // near, far, label-mid x for WB
+
+  // NS/EW street labels (truncated, in intersection corners)
+  const ewStr = E((ewStreet||'').substring(0,18));
+  const nsStr = E((nsStreet||'').substring(0,14));
+
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 300" style="background:#1a1a2e">
+  <rect x="96" y="96" width="108" height="108" fill="#383850"/>
+  <rect x="150" y="204" width="54" height="96" fill="#2d2d40"/>
+  <rect x="96"  y="0"   width="54" height="96" fill="#2d2d40"/>
+  <rect x="0"   y="150" width="96" height="54" fill="#2d2d40"/>
+  <rect x="204" y="96"  width="96" height="54" fill="#2d2d40"/>
+  <line x1="150" y1="204" x2="150" y2="300" stroke="#4a4a60" stroke-width="1.5"/>
+  <line x1="204" y1="204" x2="204" y2="300" stroke="#4a4a60" stroke-width="1.5"/>
+  <line x1="96"  y1="0"   x2="96"  y2="96"  stroke="#4a4a60" stroke-width="1.5"/>
+  <line x1="150" y1="0"   x2="150" y2="96"  stroke="#4a4a60" stroke-width="1.5"/>
+  <line x1="0"   y1="150" x2="96"  y2="150" stroke="#4a4a60" stroke-width="1.5"/>
+  <line x1="0"   y1="204" x2="96"  y2="204" stroke="#4a4a60" stroke-width="1.5"/>
+  <line x1="204" y1="96"  x2="300" y2="96"  stroke="#4a4a60" stroke-width="1.5"/>
+  <line x1="204" y1="150" x2="300" y2="150" stroke="#4a4a60" stroke-width="1.5"/>
+
+  <g color="#60a5fa">
+    ${ln(159,nbf,159,nby)}${ln(159,nby,138,nby)}${hd(138,nby,'L')}${V(155,nbm+22,'NBL','middle')}
+    ${ln(177,nbf,177,nby)}${hd(177,nby,'U')}${V(177,nbm,'NBT','middle')}
+    ${ln(195,nbf,195,nby)}${ln(195,nby,216,nby)}${hd(216,nby,'R')}${V(199,nbm+22,'NBR','middle')}
+  </g>
+  <g color="#4ade80">
+    ${ln(141,sbf,141,sby)}${ln(141,sby,162,sby)}${hd(162,sby,'R')}${V(145,sbm-22,'SBL','middle')}
+    ${ln(123,sbf,123,sby)}${hd(123,sby,'D')}${V(123,sbm,'SBT','middle')}
+    ${ln(105,sbf,105,sby)}${ln(105,sby,84,sby)}${hd(84,sby,'L')}${V(101,sbm-22,'SBR','middle')}
+  </g>
+  <g color="#fb923c">
+    ${ln(ebf,159,ebx,159)}${ln(ebx,159,ebx,138)}${hd(ebx,138,'U')}${V(ebm,155,'EBL','middle')}
+    ${ln(ebf,177,ebx,177)}${hd(ebx,177,'R')}${V(ebm,173,'EBT','middle')}
+    ${ln(ebf,195,ebx,195)}${ln(ebx,195,ebx,216)}${hd(ebx,216,'D')}${V(ebm,191,'EBR','middle')}
+  </g>
+  <g color="#c084fc">
+    ${ln(wbf,141,wbx,141)}${ln(wbx,141,wbx,162)}${hd(wbx,162,'D')}${V(wbm,137,'WBL','middle')}
+    ${ln(wbf,123,wbx,123)}${hd(wbx,123,'L')}${V(wbm,119,'WBT','middle')}
+    ${ln(wbf,105,wbx,105)}${ln(wbx,105,wbx,84)}${hd(wbx,84,'U')}${V(wbm,101,'WBR','middle')}
+  </g>
+
+  <text x="123" y="183" fill="#6b7280" font-size="8" text-anchor="middle" font-family="system-ui">${ewStr}</text>
+  <text transform="translate(177,117) rotate(-90)" fill="#6b7280" font-size="8" text-anchor="middle" font-family="system-ui">${nsStr}</text>
+  <text x="150" y="155" fill="rgba(255,255,255,0.22)" font-size="16" font-weight="700" text-anchor="middle" font-family="system-ui">${E(String(intId||''))}</text>
+</svg>`;
+}
+
+
+// ════════════════════════════════════════════════
+// CONFIG
+// ════════════════════════════════════════════════
+const SB_URL  = 'https://uvotunzymzabwjylxxiy.supabase.co';
+const SB_ANON = 'sb_publishable_lLl21XtkA9oUi09BYp8A-A_UyZSMe4o';
+
+const { createClient } = supabase;
+const sb = createClient(SB_URL, SB_ANON);
+
+// ════════════════════════════════════════════════
+// STATE
+// ════════════════════════════════════════════════
+let project  = null;
+let scenario = 'am';
+let cards    = {};   // id → { el, data }
+let conns    = [];
+const undoStack = [];
+function pushUndo(fn) {
+  undoStack.push(fn);
+  if (undoStack.length > 30) undoStack.shift();
+  document.getElementById('undo-btn').disabled = false;
+}
+async function undo() {
+  if (!undoStack.length) return;
+  await undoStack.pop()();
+  document.getElementById('undo-btn').disabled = undoStack.length === 0;
+}
+let connFrom = null;
+let dragging = null;
+let panning  = false, panOrigin = null;
+let scale = 1, tx = 0, ty = 0;
+let editingId = null;  // card id currently in edit drawer
+
+const world    = document.getElementById('world');
+const svgLayer = document.getElementById('svg-layer');
+const wrap     = document.getElementById('canvas-wrap');
+const delBtns  = document.getElementById('del-btns');
+
+function getTolerance() {
+  if (document.getElementById('tol-exact').checked) return 0;
+  return parseFloat(document.getElementById('tol-input').value) ?? 5;
+}
+
+function isOk(delta) {
+  if (document.getElementById('tol-exact').checked) return delta.diff === 0;
+  const tol = getTolerance();
+  const pct = delta.dep > 0 ? Math.abs(delta.diff) / ((delta.dep + delta.arr) / 2) * 100 : 0;
+  return pct <= tol;
+}
+
+let connDisplay = localStorage.getItem('conn-display') || 'delta'; // 'delta' | 'volume'
+let rotatingCardId = null; // card currently being rotation-dragged — block realtime resets
+function toggleExportMenu() {
+  document.getElementById('export-wrap').classList.toggle('open');
+}
+function closeExportMenu() {
+  document.getElementById('export-wrap').classList.remove('open');
+}
+document.addEventListener('click', e => {
+  if (!e.target.closest('#export-wrap')) closeExportMenu();
+});
+
+function toggleConnDisplay() {
+  connDisplay = connDisplay === 'delta' ? 'volume' : 'delta';
+  localStorage.setItem('conn-display', connDisplay);
+  document.getElementById('conn-display-btn').textContent = connDisplay === 'delta' ? 'Δ Delta' : '# Volume';
+  redrawConns();
+}
+// init button label
+document.getElementById('conn-display-btn').textContent = connDisplay === 'delta' ? 'Δ Delta' : '# Volume';
+
+// persist tolerance settings
+const tolInput = document.getElementById('tol-input');
+const tolExact = document.getElementById('tol-exact');
+tolInput.value = localStorage.getItem('tol-value') ?? '5';
+tolExact.checked = localStorage.getItem('tol-exact') === 'true';
+tolInput.addEventListener('change', () => { localStorage.setItem('tol-value', tolInput.value); redrawConns(); });
+tolExact.addEventListener('change', () => { localStorage.setItem('tol-exact', tolExact.checked); redrawConns(); });
+
+// ════════════════════════════════════════════════
+// PROJECT PICKER
+// ════════════════════════════════════════════════
+let folderExpanded = new Set();
+let _allFolders = [];
+let _allProjects = [];
+let _movingProjectId = null;
+
+async function showProjPicker() {
+  document.getElementById('proj-overlay').style.display = 'flex';
+  await refreshProjList();
+}
+
+async function refreshProjList() {
+  const list = document.getElementById('proj-list');
+  list.innerHTML = '<div style="color:var(--muted);font-size:12px;text-align:center;padding:12px">Loading…</div>';
+
+  const [{ data: foldersData }, { data: projectsData }] = await Promise.all([
+    sb.from('folders').select('*').order('name'),
+    sb.from('projects').select('*').order('name')
+  ]);
+
+  _allFolders = foldersData || [];
+  _allProjects = projectsData || [];
+
+  const folderMap = {};
+  _allFolders.forEach(f => { folderMap[f.id] = { ...f, children: [], projects: [] }; });
+
+  const roots = [];
+  _allFolders.forEach(f => {
+    if (f.parent_id && folderMap[f.parent_id]) folderMap[f.parent_id].children.push(folderMap[f.id]);
+    else roots.push(folderMap[f.id]);
+  });
+
+  const unfiled = [];
+  _allProjects.forEach(p => {
+    if (p.folder_id && folderMap[p.folder_id]) folderMap[p.folder_id].projects.push(p);
+    else unfiled.push(p);
+  });
+
+  list.innerHTML = '';
+
+  function renderProject(p, depth) {
+    const item = document.createElement('div');
+    item.className = 'proj-item';
+    item.style.paddingLeft = (depth * 18 + 10) + 'px';
+    item.innerHTML = `
+      <div style="flex:1;min-width:0">
+        <b>${esc(p.name)}</b>
+        <small style="margin-left:6px">${new Date(p.created_at).toLocaleDateString()}</small>
+      </div>
+      <div style="display:flex;gap:3px;flex-shrink:0">
+        <button class="proj-del" style="color:#a78bfa;font-size:13px;padding:0 5px;opacity:.7" title="Move to folder">⇲</button>
+        <button class="proj-del proj-dup" style="color:#60a5fa;font-size:13px;padding:0 6px;opacity:.7" title="Duplicate">⧉</button>
+        <button class="proj-del proj-rm" title="Delete">×</button>
+      </div>`;
+    item.querySelectorAll('.proj-del')[0].addEventListener('click', e => { e.stopPropagation(); openMoveDialog(p); });
+    item.querySelector('.proj-dup').addEventListener('click', e => { e.stopPropagation(); duplicateProject(p.id, p.name); });
+    item.querySelector('.proj-rm').addEventListener('click', e => { e.stopPropagation(); deleteProject(p.id); });
+    item.addEventListener('click', () => openProject(p));
+    list.appendChild(item);
+  }
+
+  function renderFolder(f, depth) {
+    const isOpen = folderExpanded.has(f.id);
+    const hasContent = f.children.length > 0 || f.projects.length > 0;
+    const div = document.createElement('div');
+    div.className = 'folder-item';
+    div.style.paddingLeft = (depth * 18) + 'px';
+    div.innerHTML = `
+      <span class="folder-chevron">${hasContent ? (isOpen ? '▾' : '▸') : ''}</span>
+      <span class="folder-icon">📁</span>
+      <span class="folder-name">${esc(f.name)}</span>
+      <span class="folder-actions">
+        ${depth < 2 ? `<button class="fld-btn" title="New subfolder">+</button>` : ''}
+        <button class="fld-btn" title="Rename">✎</button>
+        <button class="fld-btn fld-del" title="Delete">×</button>
+      </span>`;
+
+    div.addEventListener('click', e => {
+      if (e.target.tagName === 'BUTTON') return;
+      if (isOpen) folderExpanded.delete(f.id); else folderExpanded.add(f.id);
+      refreshProjList();
+    });
+
+    const btns = div.querySelectorAll('.fld-btn');
+    let btnIdx = 0;
+    if (depth < 2) { btns[btnIdx++].addEventListener('click', e => { e.stopPropagation(); createFolder(f.id); }); }
+    btns[btnIdx++].addEventListener('click', e => { e.stopPropagation(); renameFolder(f.id, f.name); });
+    btns[btnIdx].addEventListener('click', e => { e.stopPropagation(); deleteFolder(f.id, f.name); });
+
+    list.appendChild(div);
+
+    if (isOpen) {
+      f.children.forEach(child => renderFolder(child, depth + 1));
+      f.projects.forEach(p => renderProject(p, depth + 1));
+    }
+  }
+
+  roots.forEach(f => renderFolder(f, 0));
+  unfiled.forEach(p => renderProject(p, 0));
+
+  if (!roots.length && !unfiled.length) {
+    list.innerHTML = '<div style="color:var(--muted);font-size:12px;text-align:center;padding:12px">No projects yet.</div>';
+  }
+}
+
+async function createProject() {
+  const name = document.getElementById('new-proj-input').value.trim();
+  if (!name) return;
+  const { data, error } = await sb.from('projects').insert({ name }).select().single();
+  if (error) { toast('Error: ' + error.message); return; }
+  document.getElementById('new-proj-input').value = '';
+  openProject(data);
+}
+
+async function createFolder(parentId) {
+  const name = prompt(parentId ? 'New subfolder name:' : 'New folder name:');
+  if (!name?.trim()) return;
+  const row = { name: name.trim() };
+  if (parentId) row.parent_id = parentId;
+  const { error } = await sb.from('folders').insert(row);
+  if (error) { toast('Error: ' + error.message); return; }
+  if (parentId) folderExpanded.add(parentId);
+  await refreshProjList();
+}
+
+async function renameFolder(id, currentName) {
+  const name = prompt('Rename folder:', currentName);
+  if (!name?.trim() || name.trim() === currentName) return;
+  await sb.from('folders').update({ name: name.trim() }).eq('id', id);
+  await refreshProjList();
+}
+
+async function deleteFolder(id, name) {
+  if (!confirm(`Delete folder "${name}"?\n\nProjects inside will become unfiled (not deleted).`)) return;
+  await sb.from('folders').delete().eq('id', id);
+  await refreshProjList();
+}
+
+function openMoveDialog(p) {
+  _movingProjectId = p.id;
+  const sel = document.getElementById('move-folder-sel');
+  sel.innerHTML = '<option value="">— No folder (unfiled) —</option>';
+  function addOpts(folders, depth) {
+    folders.forEach(f => {
+      const opt = document.createElement('option');
+      opt.value = f.id;
+      opt.textContent = '　'.repeat(depth) + f.name;
+      if (f.id === p.folder_id) opt.selected = true;
+      sel.appendChild(opt);
+      const children = _allFolders.filter(x => x.parent_id === f.id);
+      if (children.length) addOpts(children, depth + 1);
+    });
+  }
+  addOpts(_allFolders.filter(f => !f.parent_id), 0);
+  document.getElementById('proj-overlay').style.display = 'none';
+  document.getElementById('move-overlay').style.display = 'flex';
+}
+
+async function confirmMoveProject() {
+  if (!_movingProjectId) return;
+  const folderId = document.getElementById('move-folder-sel').value || null;
+  await sb.from('projects').update({ folder_id: folderId }).eq('id', _movingProjectId);
+  _movingProjectId = null;
+  document.getElementById('move-overlay').style.display = 'none';
+  document.getElementById('proj-overlay').style.display = 'flex';
+  await refreshProjList();
+}
+
+function openAddInt() {
+  if (!project) { toast('Open a project first.'); return; }
+  ['ai-intid','ai-ns','ai-ew'].forEach(id => document.getElementById(id).value = '');
+  document.getElementById('addint-overlay').style.display = 'flex';
+}
+
+async function doAddInt() {
+  const intId  = document.getElementById('ai-intid').value.trim();
+  const ns     = document.getElementById('ai-ns').value.trim();
+  const ew     = document.getElementById('ai-ew').value.trim();
+  if (!intId) { toast('Intersection ID is required.'); return; }
+  document.getElementById('addint-overlay').style.display = 'none';
+  const existing = Object.values(cards);
+  const x = existing.length ? Math.max(...existing.map(c => parseFloat(c.el.style.left))) + 300 : 100;
+  const y = existing.length ? parseFloat(existing[0].el.style.top) : 100;
+  const rec = { project_id: project.id, int_id: intId, ns_street: ns, ew_street: ew, x, y, sort_order: existing.length, am_volumes: {}, pm_volumes: {} };
+  const { data, error } = await sb.from('intersections').insert(rec).select().single();
+  if (error) { toast('Error: ' + error.message); return; }
+  addCard(data);
+  document.getElementById('empty').style.display = 'none';
+  toast(`Added intersection ${intId}`);
+}
+
+async function duplicateProject(id, name) {
+  const newName = prompt(`Duplicate "${name}" as:`, name + ' (copy)');
+  if (!newName?.trim()) return;
+  toast('Duplicating…');
+  const { data: newProj, error: pe } = await sb.from('projects').insert({ name: newName }).select().single();
+  if (pe) { toast('Error creating project: ' + pe.message); return; }
+  const { data: ints, error: ie2 } = await sb.from('intersections').select('*').eq('project_id', id);
+  if (ie2) { toast('Error reading intersections: ' + ie2.message); return; }
+  const { data: connsData } = await sb.from('connectors').select('*').eq('project_id', id);
+  const idMap = {};
+  for (const int of (ints || [])) {
+    const { data: ni, error: ie } = await sb.from('intersections').insert({
+      project_id: newProj.id,
+      int_id: int.int_id, ns_street: int.ns_street, ew_street: int.ew_street,
+      x: int.x, y: int.y, sort_order: int.sort_order,
+      am_volumes: int.am_volumes, pm_volumes: int.pm_volumes,
+    }).select().single();
+    if (ie) { toast('Error copying intersection: ' + ie.message); return; }
+    if (ni) idMap[int.id] = ni.id;
+  }
+  for (const c of (connsData || [])) {
+    const fromId = idMap[c.from_intersection_id];
+    const toId   = idMap[c.to_intersection_id];
+    if (!fromId || !toId) continue;
+    const { error: ce } = await sb.from('connectors').insert({
+      project_id: newProj.id,
+      from_intersection_id: fromId,
+      to_intersection_id: toId,
+      from_side: c.from_side, to_side: c.to_side, direction: c.direction,
+    });
+    if (ce) toast('Warning: connector not copied — ' + ce.message);
+  }
+  toast(`Duplicated as "${newName}"`);
+  showProjPicker();
+}
+
+async function deleteIntersection(id) {
+  if (!confirm('Delete this intersection and its connectors?')) return;
+  const { data: intSnap } = await sb.from('intersections').select('*').eq('id', id).single();
+  const { data: connSnap } = await sb.from('connectors').select('*').or(`from_intersection_id.eq.${id},to_intersection_id.eq.${id}`);
+  await sb.from('connectors').delete().or(`from_intersection_id.eq.${id},to_intersection_id.eq.${id}`);
+  await sb.from('intersections').delete().eq('id', id);
+  cards[id]?.el.remove();
+  delete cards[id];
+  conns = conns.filter(c => c.from_intersection_id !== id && c.to_intersection_id !== id);
+  redrawConns();
+  pushUndo(async () => {
+    if (!intSnap) return;
+    const { data: ni } = await sb.from('intersections').insert({
+      project_id: intSnap.project_id, int_id: intSnap.int_id,
+      ns_street: intSnap.ns_street, ew_street: intSnap.ew_street,
+      x: intSnap.x, y: intSnap.y, sort_order: intSnap.sort_order,
+      am_volumes: intSnap.am_volumes, pm_volumes: intSnap.pm_volumes,
+    }).select().single();
+    if (!ni) return;
+    for (const c of (connSnap || [])) {
+      const fromId = c.from_intersection_id === id ? ni.id : c.from_intersection_id;
+      const toId   = c.to_intersection_id   === id ? ni.id : c.to_intersection_id;
+      if (!cards[fromId] && fromId !== ni.id) continue;
+      if (!cards[toId]   && toId   !== ni.id) continue;
+      await sb.from('connectors').insert({
+        project_id: c.project_id, from_intersection_id: fromId, to_intersection_id: toId,
+        from_side: c.from_side, to_side: c.to_side, direction: c.direction,
+      });
+    }
+    toast('Undo: intersection restored');
+  });
+}
+
+async function deleteProject(id) {
+  if (!confirm('Delete this project and all its data? This cannot be undone.')) return;
+  // delete children first to avoid FK constraint errors
+  await sb.from('connectors').delete().eq('project_id', id);
+  await sb.from('intersections').delete().eq('project_id', id);
+  const { error } = await sb.from('projects').delete().eq('id', id);
+  if (error) { toast('Error deleting project: ' + error.message); return; }
+  if (project?.id === id) { project = null; document.getElementById('proj-label').textContent = 'No project'; clearCanvas(); }
+  toast('Project deleted.');
+  showProjPicker();
+}
+
+async function openProject(p) {
+  project = p;
+  document.getElementById('proj-overlay').style.display = 'none';
+  document.getElementById('proj-label').textContent = p.name;
+  await loadCanvas();
+  subscribeRealtime();
+}
+
+// ════════════════════════════════════════════════
+// CANVAS
+// ════════════════════════════════════════════════
+async function loadCanvas() {
+  clearCanvas();
+  const [{ data: ints }, { data: connData }] = await Promise.all([
+    sb.from('intersections').select('*').eq('project_id', project.id).order('sort_order'),
+    sb.from('connectors').select('*').eq('project_id', project.id),
+  ]);
+  document.getElementById('empty').style.display = (ints?.length) ? 'none' : 'flex';
+  ints?.forEach(addCard);
+  connData?.forEach(c => { conns.push(c); renderConn(c); });
+}
+
+function clearCanvas() {
+  Object.values(cards).forEach(c => c.el.remove());
+  cards = {}; conns = [];
+  svgLayer.innerHTML = '';
+  redrawConns();
+}
+
+// ════════════════════════════════════════════════
+// CARDS
+// ════════════════════════════════════════════════
+function addCard(data) {
+  const el = document.createElement('div');
+  el.className = 'card';
+  el.id = 'card-' + data.id;
+  el.style.left = data.x + 'px';
+  el.style.top  = data.y + 'px';
+  el.innerHTML = `
+    <div class="card-inner"><div class="svgholder">${svgFor(data)}</div></div>
+    <div class="card-label" title="Double-click to rename">#${esc(data.int_id)} &mdash; ${esc(data.ns_street)} &amp; ${esc(data.ew_street)}</div>
+    <button class="card-edit-btn" title="Edit volumes" onclick="event.stopPropagation();openEdit('${data.id}')">✏</button>
+    <button class="card-del-btn" title="Delete intersection" onclick="event.stopPropagation();deleteIntersection('${data.id}')">×</button>
+    <button class="card-rot-btn" title="Rotate diagram">↻</button>
+    <div class="port" data-card="${data.id}" data-side="top"></div>
+    <div class="port" data-card="${data.id}" data-side="right"></div>
+    <div class="port" data-card="${data.id}" data-side="bottom"></div>
+    <div class="port" data-card="${data.id}" data-side="left"></div>
+  `;
+
+  el.addEventListener('mousedown', e => {
+    if (e.target.classList.contains('port')) { startConnDrag(e, data.id, e.target.dataset.side); return; }
+    if (e.target.closest('.card-edit-btn')) return;
+    if (e.target.closest('.card-rot-btn')) return;
+    e.preventDefault();
+    dragging = { id: data.id, sx: e.clientX, sy: e.clientY, cx: parseFloat(el.style.left), cy: parseFloat(el.style.top) };
+  });
+
+  // apply stored rotation to whole card
+  const applyRot = rot => {
+    el.style.transform = rot ? `rotate(${rot}deg)` : '';
+    el.style.transformOrigin = 'center center';
+  };
+  applyRot(data.rotation || 0);
+
+  el.querySelector('.card-rot-btn').addEventListener('mousedown', e => {
+    e.stopPropagation(); e.preventDefault();
+    const rect = el.getBoundingClientRect();
+    const cx = rect.left + rect.width / 2;
+    const cy = rect.top  + rect.height / 2;
+    const startAngle = Math.atan2(e.clientY - cy, e.clientX - cx) * 180 / Math.PI;
+    const prevRot = data.rotation || 0;
+    let startRot = prevRot;
+
+    rotatingCardId = data.id;
+    const onMove = mv => {
+      let diff = Math.atan2(mv.clientY - cy, mv.clientX - cx) * 180 / Math.PI - startAngle;
+      if (diff > 180) diff -= 360;
+      if (diff < -180) diff += 360;
+      const rot = Math.max(-90, Math.min(90, startRot + diff));
+      data.rotation = rot;
+      if (cards[data.id]) cards[data.id].data.rotation = rot; // keep portPos in sync
+      applyRot(rot);
+      redrawConns();
+    };
+    const onUp = async () => {
+      document.removeEventListener('mousemove', onMove);
+      document.removeEventListener('mouseup', onUp);
+      rotatingCardId = null;
+      const finalRot = Math.round(data.rotation);
+      await sb.from('intersections').update({ rotation: finalRot }).eq('id', data.id);
+      pushUndo(async () => {
+        data.rotation = prevRot;
+        applyRot(prevRot);
+        redrawConns();
+        await sb.from('intersections').update({ rotation: prevRot }).eq('id', data.id);
+        toast('Undo: rotation restored');
+      });
+    };
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup', onUp);
+  });
+
+  el.querySelector('.card-label').addEventListener('dblclick', e => {
+    e.stopPropagation();
+    openRenameInt(data.id);
+  });
+  world.appendChild(el);
+  cards[data.id] = { el, data };
+  attachSvgClickHandlers(data.id);
+}
+
+async function openRenameInt(id) {
+  const { data } = cards[id];
+  const intId  = prompt('Intersection number:', data.int_id);
+  if (intId === null) return;
+  const ns = prompt('N/S street:', data.ns_street);
+  if (ns === null) return;
+  const ew = prompt('E/W street:', data.ew_street);
+  if (ew === null) return;
+  const updates = { int_id: intId.trim(), ns_street: ns.trim(), ew_street: ew.trim() };
+  Object.assign(data, updates);
+  const label = cards[id].el.querySelector('.card-label');
+  label.innerHTML = `#${esc(data.int_id)} &mdash; ${esc(data.ns_street)} &amp; ${esc(data.ew_street)}`;
+  cards[id].el.querySelector('.svgholder').innerHTML = svgFor(data);
+  attachSvgClickHandlers(id);
+  await sb.from('intersections').update(updates).eq('id', id);
+  toast('Intersection updated.');
+}
+
+function svgFor(d) {
+  const vols = scenario === 'pm' ? d.pm_volumes : d.am_volumes;
+  return generateIntersectionSVG(vols, d.int_id, d.ns_street, d.ew_street);
+}
+
+function refreshCards() {
+  Object.values(cards).forEach(({ el, data }) => {
+    el.querySelector('.svgholder').innerHTML = svgFor(data);
+    attachSvgClickHandlers(data.id);
+  });
+  redrawConns();
+}
+
+// ════════════════════════════════════════════════
+// INLINE SVG CLICK-TO-EDIT
+// ════════════════════════════════════════════════
+const inlineInput = document.getElementById('svg-inline-input');
+let inlineState = null; // { cardId, field, period }
+
+function attachSvgClickHandlers(cardId) {
+  const { el } = cards[cardId];
+  const svgEl = el.querySelector('.svgholder svg');
+  if (!svgEl) return;
+  svgEl.querySelectorAll('text[data-field]').forEach(textEl => {
+    const field = textEl.dataset.field;
+    textEl.style.cursor = 'pointer';
+    textEl.onmousedown = e => {
+      e.preventDefault(); // keeps focus on inlineInput — prevents blur from firing
+      e.stopPropagation();
+      // commit previous edit synchronously before switching fields
+      flushInlineEdit();
+      const period = scenario === 'pm' ? 'pm' : 'am';
+      const vols = period === 'am' ? cards[cardId].data.am_volumes : cards[cardId].data.pm_volumes;
+      const rect = textEl.getBoundingClientRect();
+      inlineInput.value = vols?.[field] ?? '0';
+      inlineInput.style.display = 'block';
+      inlineInput.style.left = rect.left + 'px';
+      inlineInput.style.top  = (rect.top - 4) + 'px';
+      inlineState = { cardId, field, period };
+      inlineInput.focus();
+      inlineInput.select();
+    };
+  });
+}
+
+function flushInlineEdit() {
+  if (!inlineState) return;
+  const { cardId, field, period } = inlineState;
+  inlineState = null;
+  const val = Math.max(0, parseInt(inlineInput.value) || 0);
+  const { data } = cards[cardId];
+  const prevAm = { ...data.am_volumes };
+  const prevPm = { ...data.pm_volumes };
+  const newAm = { ...data.am_volumes };
+  const newPm = { ...data.pm_volumes };
+  if (period === 'am') newAm[field] = String(val); else newPm[field] = String(val);
+  const updates = { am_volumes: newAm, pm_volumes: newPm };
+  Object.assign(data, updates);
+  const svgEl = cards[cardId]?.el.querySelector('.svgholder svg');
+  const textNode = svgEl?.querySelector(`text[data-field="${field}"]`);
+  if (textNode) textNode.textContent = String(val);
+  redrawConns();
+  sb.from('intersections').update(updates).eq('id', cardId);
+  pushUndo(async () => {
+    if (!cards[cardId]) return;
+    Object.assign(cards[cardId].data, { am_volumes: prevAm, pm_volumes: prevPm });
+    cards[cardId].el.querySelector('.svgholder').innerHTML = svgFor(cards[cardId].data);
+    attachSvgClickHandlers(cardId);
+    redrawConns();
+    await sb.from('intersections').update({ am_volumes: prevAm, pm_volumes: prevPm }).eq('id', cardId);
+    toast('Undo: volume restored');
+  });
+}
+
+function commitInlineEdit() {
+  if (!inlineState) return;
+  inlineInput.style.display = 'none';
+  flushInlineEdit();
+}
+
+inlineInput.addEventListener('blur', commitInlineEdit);
+inlineInput.addEventListener('keydown', e => {
+  if (e.key === 'Enter') { inlineInput.style.display = 'none'; flushInlineEdit(); }
+  if (e.key === 'Escape') { inlineState = null; inlineInput.style.display = 'none'; }
+});
+
+// ════════════════════════════════════════════════
+// EDIT DRAWER
+// ════════════════════════════════════════════════
+const VOL_FIELDS = ['EBL','EBT','EBR','WBL','WBT','WBR','NBL','NBT','NBR','SBL','SBT','SBR'];
+const DIR_GROUPS = [
+  { label: 'Eastbound',  fields: ['EBL','EBT','EBR'] },
+  { label: 'Westbound',  fields: ['WBL','WBT','WBR'] },
+  { label: 'Northbound', fields: ['NBL','NBT','NBR'] },
+  { label: 'Southbound', fields: ['SBL','SBT','SBR'] },
+];
+
+function openEdit(cardId) {
+  editingId = cardId;
+  const { data } = cards[cardId];
+  document.getElementById('edit-title').textContent = `#${data.int_id} — ${data.ns_street} & ${data.ew_street}`;
+
+  const body = document.getElementById('edit-body');
+  body.innerHTML = '';
+
+  // Identity fields
+  const idGrid = document.createElement('div');
+  idGrid.className = 'edit-grid';
+  idGrid.style.marginBottom = '4px';
+  idGrid.innerHTML = `
+    <div class="flabel">Int #</div>
+    <input id="ei-intid" type="text" value="${esc(data.int_id)}" style="grid-column:span 2" />
+    <div class="flabel">N/S St</div>
+    <input id="ei-ns" type="text" value="${esc(data.ns_street)}" style="grid-column:span 2" />
+    <div class="flabel">E/W St</div>
+    <input id="ei-ew" type="text" value="${esc(data.ew_street)}" style="grid-column:span 2" />
+  `;
+  body.appendChild(idGrid);
+
+  const divider = document.createElement('div');
+  divider.style.cssText = 'border-top:1px solid #2a2a4a;margin:6px 0 10px';
+  body.appendChild(divider);
+
+  DIR_GROUPS.forEach(({ label, fields }) => {
+    const sectionLabel = document.createElement('div');
+    sectionLabel.className = 'edit-section-label';
+    sectionLabel.textContent = label;
+    body.appendChild(sectionLabel);
+
+    const grid = document.createElement('div');
+    grid.className = 'edit-grid';
+    grid.innerHTML = `<div></div><div class="hdr">AM</div><div class="hdr">PM</div>`;
+
+    fields.forEach(f => {
+      const lbl = document.createElement('div');
+      lbl.className = 'flabel';
+      lbl.textContent = f;
+
+      const amVal = data.am_volumes?.[f] ?? '0';
+      const pmVal = data.pm_volumes?.[f] ?? '0';
+
+      const amIn = document.createElement('input');
+      amIn.type = 'number'; amIn.min = '0';
+      amIn.value = amVal;
+      amIn.dataset.field = f; amIn.dataset.period = 'am';
+      amIn.addEventListener('input', () => { amIn.classList.add('changed'); livePreview(); });
+
+      const pmIn = document.createElement('input');
+      pmIn.type = 'number'; pmIn.min = '0';
+      pmIn.value = pmVal;
+      pmIn.dataset.field = f; pmIn.dataset.period = 'pm';
+      pmIn.addEventListener('input', () => { pmIn.classList.add('changed'); livePreview(); });
+
+      grid.appendChild(lbl);
+      grid.appendChild(amIn);
+      grid.appendChild(pmIn);
+    });
+    body.appendChild(grid);
+  });
+
+  document.getElementById('edit-drawer').classList.add('open');
+}
+
+function closeEdit() {
+  document.getElementById('edit-drawer').classList.remove('open');
+  editingId = null;
+}
+
+function getEditedVolumes() {
+  const amVols = {}, pmVols = {};
+  document.querySelectorAll('#edit-body input').forEach(inp => {
+    const f = inp.dataset.field;
+    const v = String(Math.max(0, parseInt(inp.value) || 0));
+    if (inp.dataset.period === 'am') amVols[f] = v;
+    else pmVols[f] = v;
+  });
+  return { amVols, pmVols };
+}
+
+function livePreview() {
+  if (!editingId) return;
+  const { data } = cards[editingId];
+  const { amVols, pmVols } = getEditedVolumes();
+  // Merge with existing to get preview volumes
+  const previewAm = { ...data.am_volumes, ...amVols };
+  const previewPm = { ...data.pm_volumes, ...pmVols };
+  const previewData = { ...data, am_volumes: previewAm, pm_volumes: previewPm };
+  // Re-populate SVGs for preview (use stored template text if available; otherwise just show stale SVG)
+  // Delta badges update live
+  cards[editingId].data = previewData;
+  redrawConns();
+}
+
+async function saveEdit() {
+  if (!editingId) return;
+  const { data } = cards[editingId];
+  const { amVols, pmVols } = getEditedVolumes();
+
+  const newAm = { ...data.am_volumes, ...amVols };
+  const newPm = { ...data.pm_volumes, ...pmVols };
+  const intId = document.getElementById('ei-intid')?.value.trim() || data.int_id;
+  const ns    = document.getElementById('ei-ns')?.value.trim()    || data.ns_street;
+  const ew    = document.getElementById('ei-ew')?.value.trim()    || data.ew_street;
+  const updates = { am_volumes: newAm, pm_volumes: newPm, int_id: intId, ns_street: ns, ew_street: ew };
+  const { error } = await sb.from('intersections').update(updates).eq('id', editingId);
+  if (error) { toast('Save failed: ' + error.message); return; }
+
+  cards[editingId].data = { ...data, ...updates };
+  // update card label
+  const label = cards[editingId].el.querySelector('.card-label');
+  if (label) label.innerHTML = `#${esc(intId)} &mdash; ${esc(ns)} &amp; ${esc(ew)}`;
+  cards[editingId].el.querySelector('.svgholder').innerHTML = svgFor(cards[editingId].data);
+  redrawConns();
+  closeEdit();
+  toast('Saved.');
+}
+
+
+
+// ════════════════════════════════════════════════
+// DRAG-TO-CONNECT
+// ════════════════════════════════════════════════
+let dragLine = null;
+
+// Convert screen coords → world (SVG) coords
+function toWorld(clientX, clientY) {
+  const r = wrap.getBoundingClientRect();
+  return { x: (clientX - r.left - tx) / scale, y: (clientY - r.top - ty) / scale };
+}
+
+// World position of a port on a card
+function portWorldPos(cardId, side) {
+  const el = cards[cardId]?.el;
+  if (!el) return null;
+  const x = parseFloat(el.style.left), y = parseFloat(el.style.top);
+  const w = el.offsetWidth,            h = el.offsetHeight;
+  return { top:{x:x+w/2,y}, right:{x:x+w,y:y+h/2}, bottom:{x:x+w/2,y:y+h}, left:{x,y:y+h/2} }[side];
+}
+
+// Find which card the world point is inside (or nearest port within 60px)
+function cardAtWorld(wx, wy, excludeCardId) {
+  for (const [id, {el}] of Object.entries(cards)) {
+    if (id === excludeCardId) continue;
+    const x = parseFloat(el.style.left), y = parseFloat(el.style.top);
+    const w = el.offsetWidth, h = el.offsetHeight;
+    if (wx >= x-20 && wx <= x+w+20 && wy >= y-20 && wy <= y+h+20) return id;
+  }
+  return null;
+}
+
+function startConnDrag(e, cardId, side) {
+  e.stopPropagation(); e.preventDefault();
+  connFrom = { cardId, side };
+  const p = portWorldPos(cardId, side);
+  dragLine = document.createElementNS('http://www.w3.org/2000/svg','line');
+  dragLine.setAttribute('stroke','#94a3b8');
+  dragLine.setAttribute('stroke-width','2');
+  dragLine.setAttribute('stroke-dasharray','6,3');
+  dragLine.setAttribute('pointer-events','none');
+  dragLine.setAttribute('x1', p.x); dragLine.setAttribute('y1', p.y);
+  dragLine.setAttribute('x2', p.x); dragLine.setAttribute('y2', p.y);
+  svgLayer.appendChild(dragLine);
+  svgLayer.style.pointerEvents = 'none'; // let mouse events reach cards underneath
+  document.getElementById('card-'+cardId)?.querySelectorAll('.port').forEach(p=>{ if(p.dataset.side===side) p.classList.add('lit'); });
+}
+
+document.addEventListener('mousemove', e => {
+  if (!connFrom || !dragLine) return;
+  const {x,y} = toWorld(e.clientX, e.clientY);
+  dragLine.setAttribute('x2', x);
+  dragLine.setAttribute('y2', y);
+  // Highlight target card and snap to nearest port on it
+  document.querySelectorAll('.card.conn-hover').forEach(el=>el.classList.remove('conn-hover'));
+  document.querySelectorAll('.port.snap-lit').forEach(p=>p.classList.remove('snap-lit'));
+  const targetId = cardAtWorld(x, y, connFrom.cardId);
+  if (targetId) {
+    cards[targetId]?.el.classList.add('conn-hover');
+    const nearest = nearestPort(targetId, x, y);
+    if (nearest) {
+      cards[targetId].el.querySelector(`.port[data-side="${nearest}"]`)?.classList.add('snap-lit');
+    }
+  }
+});
+
+function nearestPort(cardId, wx, wy) {
+  const el = cards[cardId]?.el;
+  if (!el) return null;
+  const cx = parseFloat(el.style.left), cy = parseFloat(el.style.top);
+  const S = el.offsetWidth;
+  const ports = { top:[cx+S/2, cy], bottom:[cx+S/2, cy+S], left:[cx, cy+S/2], right:[cx+S, cy+S/2] };
+  let best = null, bestD = Infinity;
+  for (const [side, [px, py]] of Object.entries(ports)) {
+    const d = Math.hypot(wx-px, wy-py);
+    if (d < bestD) { bestD = d; best = side; }
+  }
+  return best;
+}
+
+document.addEventListener('mouseup', e => {
+  if (!connFrom) return;
+  // Use browser hit-test to find which card we dropped onto
+  const fromId = connFrom.cardId;
+  const savedFrom = connFrom;
+  // Clean up drag state first
+  document.querySelectorAll('.port.lit, .card.conn-hover').forEach(el=>{ el.classList.remove('lit'); el.classList.remove('conn-hover'); });
+  if (dragLine) { dragLine.remove(); dragLine=null; }
+  connFrom = null;
+
+  // Hit-test BEFORE restoring pointer events (SVG is still non-blocking)
+  const el = document.elementFromPoint(e.clientX, e.clientY);
+  svgLayer.style.pointerEvents = '';
+
+  const targetCard = el?.closest('.card');
+  if (!targetCard) return;
+  const targetId = targetCard.id.replace('card-', '');
+  if (targetId === fromId) return;
+
+  const sideToDir = { right:'eb', left:'wb', top:'nb', bottom:'sb' };
+  const fromSide = savedFrom.side;
+  const dir = sideToDir[fromSide] || 'eb';
+  const {x: wx, y: wy} = toWorld(e.clientX, e.clientY);
+  const toSide = nearestPort(targetId, wx, wy) || 'left';
+  persistConn(fromId, fromSide, targetId, toSide, dir);
+});
+
+document.addEventListener('keydown', e => {
+  if ((e.ctrlKey||e.metaKey) && e.key==='z') { e.preventDefault(); undo(); return; }
+  if (e.key==='Escape' && connFrom) {
+  document.querySelectorAll('.port.lit,.port.snap-lit').forEach(p=>{p.classList.remove('lit');p.classList.remove('snap-lit');});
+  if (dragLine){dragLine.remove();dragLine=null;} connFrom=null;
+}});
+
+function guessDir(fromId, toId) {
+  const from = cards[fromId], to = cards[toId];
+  if (!from || !to) return 'eb';
+  const dx = parseFloat(to.el.style.left) - parseFloat(from.el.style.left);
+  const dy = parseFloat(to.el.style.top)  - parseFloat(from.el.style.top);
+  if (Math.abs(dx) >= Math.abs(dy)) return dx > 0 ? 'eb' : 'wb';
+  return dy > 0 ? 'sb' : 'nb';
+}
+
+async function persistConn(fromId, fromSide, toId, toSide, dir) {
+  const rec = { project_id: project.id, from_intersection_id: fromId, from_side: fromSide, to_intersection_id: toId, to_side: toSide, direction: dir };
+  const { data, error } = await sb.from('connectors').insert(rec).select().single();
+  if (error) { toast('Error: ' + error.message); console.error(error); return; }
+  conns.push(data); renderConn(data);
+  toast(`Connected — ${dir.toUpperCase()} link`);
+}
+
+// ════════════════════════════════════════════════
+// CONNECTORS + DELTA BADGES
+// ════════════════════════════════════════════════
+const DIR_COLOR = { eb: '#3b82f6', wb: '#ef4444', nb: '#22c55e', sb: '#a855f7' };
+const THRU_KEY  = { eb: 'EBT', wb: 'WBT', nb: 'NBT', sb: 'SBT' };
+
+function getVols(d) {
+  return scenario === 'pm' ? (d.pm_volumes || {}) : (d.am_volumes || {});
+}
+
+function linkDeparture(vols, dir) {
+  const v = f => parseInt(vols[f] ?? 0);
+  switch (dir) {
+    case 'eb': return v('EBT') + v('NBR') + v('SBL');
+    case 'wb': return v('WBT') + v('NBL') + v('SBR');
+    case 'nb': return v('NBT') + v('EBL') + v('WBR');
+    case 'sb': return v('SBT') + v('WBL') + v('EBR');
+  }
+  return 0;
+}
+
+function linkArrival(vols, dir) {
+  const v = f => parseInt(vols[f] ?? 0);
+  switch (dir) {
+    case 'eb': return v('EBT') + v('EBL') + v('EBR');
+    case 'wb': return v('WBT') + v('WBL') + v('WBR');
+    case 'nb': return v('NBT') + v('NBL') + v('NBR');
+    case 'sb': return v('SBT') + v('SBL') + v('SBR');
+  }
+  return 0;
+}
+
+const SIDE_DIR = { right:'eb', left:'wb', top:'nb', bottom:'sb' };
+
+function calcDelta(fromData, toData, depDir, arrDir) {
+  const dep = linkDeparture(getVols(fromData), depDir);
+  const arr = linkArrival(getVols(toData), arrDir || depDir);
+  return { dep, arr, diff: dep - arr };
+}
+
+const REVERSE = { eb:'wb', wb:'eb', nb:'sb', sb:'nb' };
+
+function renderConn(conn) { redrawConns(); }
+
+async function removeConn(id) {
+  await sb.from('connectors').delete().eq('id', id);
+  conns = conns.filter(c => c.id !== id);
+  redrawConns();
+}
+
+async function clearAllConns() {
+  if (!project || !conns.length) return;
+  if (!confirm('Delete all links for this project?')) return;
+  await sb.from('connectors').delete().eq('project_id', project.id);
+  conns = [];
+  redrawConns();
+}
+
+function redrawConns() {
+const S = 260; // card size in world px
+
+  // ── SVG canvas connectors ──
+  svgLayer.querySelectorAll('g[data-cid]').forEach(g => g.remove());
+  const connHits = document.getElementById('conn-hits');
+  connHits.innerHTML = '';
+  const ns = 'http://www.w3.org/2000/svg';
+
+  const portPos = (cardEl, cardData, side) => {
+    const bx = parseFloat(cardEl.style.left), by = parseFloat(cardEl.style.top);
+    const cx = bx+S/2, cy = by+S/2;
+    const raw = { right:[S/2,0], left:[-S/2,0], top:[0,-S/2], bottom:[0,S/2] }[side];
+    if (!raw) return null;
+    const rot = (cardData.rotation || 0) * Math.PI / 180;
+    const cos = Math.cos(rot), sin = Math.sin(rot);
+    return [cx + cos*raw[0] - sin*raw[1], cy + sin*raw[0] + cos*raw[1]];
+  };
+
+  conns.forEach(c => {
+    const fc = cards[c.from_intersection_id], tc = cards[c.to_intersection_id];
+    if (!fc || !tc) return;
+    const dirToSide = { eb:'right', wb:'left', nb:'top', sb:'bottom' };
+    const fromSide = c.from_side || dirToSide[c.direction] || 'right';
+    const toSide   = c.to_side   || dirToSide[REVERSE[c.direction]] || 'left';
+    const fp = portPos(fc.el, fc.data, fromSide);
+    const tp = portPos(tc.el, tc.data, toSide);
+    if (!fp || !tp) return;
+    let x1=fp[0], y1=fp[1], x2=tp[0], y2=tp[1];
+    const dx=x2-x1, dy=y2-y1, len=Math.sqrt(dx*dx+dy*dy)||1;
+    const OFF = c.one_way ? 0 : 10; // no offset for one-way, small offset for two-way
+    const px=-dy/len*OFF, py=dx/len*OFF;
+    const mx=(x1+x2)/2, my=(y1+y2)/2;
+    const depDir    = SIDE_DIR[c.from_side] || c.direction;
+    const revDir    = REVERSE[depDir];
+    const arrDir    = REVERSE[SIDE_DIR[c.to_side]] || revDir;
+    const revDepDir = SIDE_DIR[c.to_side]  || revDir;
+    const fwd = calcDelta(fc.data, tc.data, depDir,    arrDir);
+    const rev = calcDelta(tc.data, fc.data, revDepDir, revDir);
+
+    const lineColor = (delta) => isOk(delta) ? '#22c55e' : '#ef4444';
+
+    const g = document.createElementNS(ns,'g'); g.dataset.cid = c.id;
+
+    // Line 1 — primary direction
+    const l1 = document.createElementNS(ns,'line');
+    l1.setAttribute('x1',x1+px); l1.setAttribute('y1',y1+py);
+    l1.setAttribute('x2',x2+px); l1.setAttribute('y2',y2+py);
+    l1.setAttribute('stroke', lineColor(fwd));
+    l1.setAttribute('stroke-width','5'); l1.setAttribute('stroke-linecap','round');
+    g.appendChild(l1);
+
+    // Line 2 — reverse direction (hidden if one-way)
+    if (!c.one_way) {
+      const l2 = document.createElementNS(ns,'line');
+      l2.setAttribute('x1',x2-px); l2.setAttribute('y1',y2-py);
+      l2.setAttribute('x2',x1-px); l2.setAttribute('y2',y1-py);
+      l2.setAttribute('stroke', lineColor(rev));
+      l2.setAttribute('stroke-width','5'); l2.setAttribute('stroke-linecap','round');
+      g.appendChild(l2);
+    }
+
+    // Center divider dash (two-way only)
+    const cDiv = document.createElementNS(ns,'line');
+    cDiv.setAttribute('x1',x1); cDiv.setAttribute('y1',y1);
+    cDiv.setAttribute('x2',x2); cDiv.setAttribute('y2',y2);
+    cDiv.setAttribute('stroke','rgba(255,255,255,0.12)'); cDiv.setAttribute('stroke-width','1.5');
+    cDiv.setAttribute('stroke-dasharray','8,6');
+    g.appendChild(cDiv);
+
+    const DIR_ARROW = { eb:'→', wb:'←', nb:'↑', sb:'↓' };
+
+    // Badge centered on its own lane line at midpoint
+    const mkBadge = (delta, dir, lx, ly) => {
+      const ok = isOk(delta);
+      const bc = ok ? '#22c55e' : '#ef4444';
+      const arrow = DIR_ARROW[dir] || '';
+      const sign = delta.diff > 0 ? '+' : '';
+      const label = connDisplay === 'volume'
+        ? `${arrow} ${delta.dep}`
+        : (ok ? `${arrow} ✓` : `${arrow} ${sign}${delta.diff}`);
+      const w = 72, h = 22;
+      const r=document.createElementNS(ns,'rect');
+      r.setAttribute('x',lx-w/2); r.setAttribute('y',ly-h/2);
+      r.setAttribute('width',w); r.setAttribute('height',h);
+      r.setAttribute('rx','11'); r.setAttribute('fill',bc);
+      r.setAttribute('stroke','#111'); r.setAttribute('stroke-width','1.5');
+      g.appendChild(r);
+      const t=document.createElementNS(ns,'text');
+      t.setAttribute('x',lx); t.setAttribute('y',ly+4);
+      t.setAttribute('text-anchor','middle'); t.setAttribute('font-size','12');
+      t.setAttribute('font-weight','700'); t.setAttribute('fill','#fff');
+      t.setAttribute('font-family','system-ui,sans-serif');
+      t.textContent=label;
+      g.appendChild(t);
+    };
+    // badges — one-way sits on the line, two-way offset further so they don't overlap
+    const BADGE_OFF = c.one_way ? 0 : 36;
+    const bpx = -dy/len*BADGE_OFF, bpy = dx/len*BADGE_OFF;
+    mkBadge(fwd, depDir, mx+bpx, my+bpy);
+    if (!c.one_way) mkBadge(rev, revDir, mx-bpx, my-bpy);
+
+    svgLayer.appendChild(g);
+
+    // Hit area spans full connector length for easy dblclick-to-delete
+    const hit = document.createElement('div');
+    const isH = Math.abs(dx) > Math.abs(dy);
+    if (isH) {
+      hit.style.cssText = `position:absolute;left:${Math.min(x1,x2)}px;top:${my-18}px;width:${Math.abs(dx)}px;height:36px;cursor:pointer;pointer-events:all;`;
+    } else {
+      hit.style.cssText = `position:absolute;left:${mx-18}px;top:${Math.min(y1,y2)}px;width:36px;height:${Math.abs(dy)}px;cursor:pointer;pointer-events:all;`;
+    }
+    hit.title = 'Double-click to delete · Right-click to toggle one-way';
+    hit.addEventListener('contextmenu', async e => {
+      e.preventDefault(); e.stopPropagation();
+      const conn = conns.find(x => x.id === c.id);
+      if (!conn) return;
+      const prev = conn.one_way;
+      conn.one_way = !conn.one_way;
+      await sb.from('connectors').update({ one_way: conn.one_way }).eq('id', conn.id);
+      redrawConns();
+      toast(conn.one_way ? 'Set to one-way' : 'Set to two-way');
+      pushUndo(async () => {
+        conn.one_way = prev;
+        await sb.from('connectors').update({ one_way: prev }).eq('id', conn.id);
+        redrawConns();
+        toast('Undo: connector direction restored');
+      });
+    });
+    hit.addEventListener('dblclick', e => {
+      e.stopPropagation();
+      if (confirm('Delete this link?')) {
+        const snap = conns.find(x => x.id === c.id);
+        removeConn(c.id);
+        if (snap) pushUndo(async () => {
+          const { data: nc } = await sb.from('connectors').insert({
+            project_id: snap.project_id, from_intersection_id: snap.from_intersection_id,
+            to_intersection_id: snap.to_intersection_id, from_side: snap.from_side,
+            to_side: snap.to_side, direction: snap.direction,
+          }).select().single();
+          if (nc) { conns.push(nc); redrawConns(); }
+          toast('Undo: connector restored');
+        });
+      }
+    });
+    connHits.appendChild(hit);
+  });
+
+}
+
+// ════════════════════════════════════════════════
+// CANVAS CONTROLS
+// ════════════════════════════════════════════════
+wrap.addEventListener('wheel', e => {
+  e.preventDefault();
+  const f = e.deltaY<0?1.05:0.952, r = wrap.getBoundingClientRect();
+  const mx = e.clientX-r.left, my = e.clientY-r.top;
+  tx = mx-(mx-tx)*f; ty = my-(my-ty)*f;
+  scale = Math.min(4,Math.max(0.1,scale*f));
+  applyTransform();
+}, { passive:false });
+
+wrap.addEventListener('mousedown', e => {
+  if (e.button===1||(e.button===0&&e.altKey)) {
+    e.preventDefault(); panning=true; panOrigin={x:e.clientX-tx,y:e.clientY-ty}; wrap.classList.add('panning');
+  }
+});
+
+document.addEventListener('mousemove', e => {
+  if (panning) { tx=e.clientX-panOrigin.x; ty=e.clientY-panOrigin.y; applyTransform(); return; }
+  if (dragging) {
+    const dx=(e.clientX-dragging.sx)/scale, dy=(e.clientY-dragging.sy)/scale;
+    const el=cards[dragging.id]?.el; if(el){el.style.left=(dragging.cx+dx)+'px';el.style.top=(dragging.cy+dy)+'px';}
+    redrawConns();
+    redrawConns();
+  }
+});
+
+document.addEventListener('mouseup', async e => {
+  if (panning) { panning=false; wrap.classList.remove('panning'); }
+  if (dragging) {
+    const {id}=dragging, el=cards[id]?.el;
+    const x=parseFloat(el.style.left), y=parseFloat(el.style.top);
+    dragging=null;
+    const { am_volumes, pm_volumes, rotation } = cards[id]?.data || {};
+    await sb.from('intersections').update({x, y, am_volumes, pm_volumes, rotation: rotation || 0}).eq('id',id);
+  }
+});
+
+function applyTransform() {
+  world.style.transform=`translate(${tx}px,${ty}px) scale(${scale})`;
+  document.getElementById('status-zoom').textContent=Math.round(scale*100)+'%';
+  // Counter-scale labels so they stay ~12px on screen regardless of zoom
+  const labelPx = Math.round(Math.min(48, 12 / scale));
+  document.querySelectorAll('.card-label').forEach(el => el.style.fontSize = labelPx + 'px');
+  redrawConns();
+}
+
+function autoArrange() {
+  const ids=Object.keys(cards); const cols=Math.max(1,Math.ceil(Math.sqrt(ids.length)));
+  ids.forEach((id,i)=>{
+    const x=60+(i%cols)*300, y=60+Math.floor(i/cols)*300;
+    cards[id].el.style.left=x+'px'; cards[id].el.style.top=y+'px';
+    cards[id].data.x=x; cards[id].data.y=y;
+    sb.from('intersections').update({x,y}).eq('id',id);
+  });
+  redrawConns(); redrawConns(); fitView();
+}
+
+function fitView() {
+  const ids=Object.keys(cards); if(!ids.length) return;
+  let x0=Infinity,y0=Infinity,x1=-Infinity,y1=-Infinity;
+  ids.forEach(id=>{
+    const x=parseFloat(cards[id].el.style.left),y=parseFloat(cards[id].el.style.top);
+    x0=Math.min(x0,x);y0=Math.min(y0,y);x1=Math.max(x1,x+260);y1=Math.max(y1,y+260);
+  });
+  const pad=50,cw=wrap.clientWidth,ch=wrap.clientHeight;
+  scale=Math.min((cw-pad*2)/(x1-x0),(ch-pad*2)/(y1-y0),2);
+  tx=pad-x0*scale; ty=pad-y0*scale; applyTransform();
+}
+
+// ════════════════════════════════════════════════
+// SCENARIO
+// ════════════════════════════════════════════════
+function setScenario(s) {
+  scenario=s;
+  ['am','pm'].forEach(x=>document.getElementById('btn-'+x).classList.toggle('on',x===s));
+  refreshCards();
+}
+
+// ════════════════════════════════════════════════
+// EXPORT CSV
+// ════════════════════════════════════════════════
+async function saveAll() {
+  if (!project) { toast('No project open.'); return; }
+  const btn = document.getElementById('save-btn');
+  btn.textContent = 'Saving…'; btn.disabled = true;
+  await Promise.all(Object.values(cards).map(({ data }) =>
+    sb.from('intersections').update({
+      am_volumes: data.am_volumes, pm_volumes: data.pm_volumes,
+      x: parseFloat(cards[data.id].el.style.left), y: parseFloat(cards[data.id].el.style.top),
+      rotation: data.rotation || 0,
+    }).eq('id', data.id)
+  ));
+  btn.textContent = '✓ Saved'; btn.disabled = false;
+  setTimeout(() => { btn.textContent = 'Save'; }, 2000);
+}
+
+function exportSynchro() {
+  if (!project) { toast('Open a project first.'); return; }
+  const ints = Object.values(cards).map(c => c.data).sort((a, b) => a.sort_order - b.sort_order);
+  if (!ints.length) { toast('No intersections to export.'); return; }
+
+  const today = new Date();
+  const dateStr = `${today.getMonth()+1}/${today.getDate()}/${today.getFullYear()}`;
+
+  const SYNCHRO_COLS = ['DATE','TIME','INTID','NBL2','NBL','NBT','NBR','NBR2','SBL','SBT','SBR','EBL2','EBL','EBT','EBR','EBR2','WBL2','WBL','WBT','WBR','WBR2','NEL2','NEL','NET','NER','NER2','NWL','NWT','NWR','SEL2','SEL','SET','SER','SER2','SWL2','SWL','SWT','SWR','SWR2'];
+
+  const buildRows = (period, time) => {
+    return ints.map(d => {
+      const v = (period === 'am' ? d.am_volumes : d.pm_volumes) || {};
+      const get = f => v[f] || '';
+      const row = {
+        DATE: dateStr, TIME: time, INTID: d.int_id,
+        NBL2:'', NBL: get('NBL'), NBT: get('NBT'), NBR: get('NBR'), NBR2:'',
+        SBL: get('SBL'), SBT: get('SBT'), SBR: get('SBR'),
+        EBL2:'', EBL: get('EBL'), EBT: get('EBT'), EBR: get('EBR'), EBR2:'',
+        WBL2:'', WBL: get('WBL'), WBT: get('WBT'), WBR: get('WBR'), WBR2:'',
+        NEL2:'', NEL:'', NET:'', NER:'', NER2:'',
+        NWL:'', NWT:'', NWR:'',
+        SEL2:'', SEL:'', SET:'', SER:'', SER2:'',
+        SWL2:'', SWL:'', SWT:'', SWR:'', SWR2:'',
+      };
+      return SYNCHRO_COLS.map(c => row[c] ?? '').join(',');
+    });
+  };
+
+  const header1 = 'Turning Movement Count' + ','.repeat(SYNCHRO_COLS.length - 1);
+  const header2 = '60 Minute Counts' + ','.repeat(SYNCHRO_COLS.length - 1);
+  const colRow  = SYNCHRO_COLS.join(',');
+
+  const buildCSV = (period, time) =>
+    [header1, header2, colRow, ...buildRows(period, time)].join('\n');
+
+  const dl = (content, filename) => {
+    const blob = new Blob([content], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = filename; a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const name = project.name.replace(/\s+/g, '_');
+  dl(buildCSV('am', '800'),  `${name}_AM_VOLUME.CSV`);
+  dl(buildCSV('pm', '1700'), `${name}_PM_VOLUME.CSV`);
+  toast('Synchro files exported (AM + PM).');
+}
+
+function exportNetwork() {
+  if (!project) { toast('Open a project first.'); return; }
+  const ints = Object.values(cards).map(c => c.data);
+  if (!ints.length) { toast('No intersections to export.'); return; }
+
+  // Sort north→south, west→east by canvas position
+  const sorted = [...ints].sort((a, b) => {
+    const ay = parseFloat(cards[a.id].el.style.top),  by2 = parseFloat(cards[b.id].el.style.top);
+    const ax = parseFloat(cards[a.id].el.style.left), bx  = parseFloat(cards[b.id].el.style.left);
+    if (Math.abs(ay - by2) > 40) return ay - by2; // primarily top→bottom (N→S)
+    return ax - bx; // secondarily left→right (W→E)
+  });
+
+  // Build a lookup from db id → enriched object
+  const intMap = {};
+  sorted.forEach((d, rank) => {
+    const x = parseFloat(cards[d.id].el.style.left);
+    const y = parseFloat(cards[d.id].el.style.top);
+    intMap[d.id] = {
+      id: d.id,
+      int_id: d.int_id,
+      ns_street: d.ns_street,
+      ew_street: d.ew_street,
+      canvas_position: { x: Math.round(x), y: Math.round(y) },
+      spatial_rank_n_to_s: rank + 1,
+      am_volumes: d.am_volumes || {},
+      pm_volumes: d.pm_volumes || {},
+    };
+  });
+
+  // Build connector list with computed deltas
+  const SIDE_DIR2 = { right:'EB', left:'WB', top:'NB', bottom:'SB' };
+  const REV2      = { EB:'WB', WB:'EB', NB:'SB', SB:'NB' };
+  const links = conns.map(c => {
+    const fi = intMap[c.from_intersection_id], ti = intMap[c.to_intersection_id];
+    if (!fi || !ti) return null;
+    const depDir = SIDE_DIR2[c.from_side] || c.direction?.toUpperCase() || '?';
+    const arrDir = REV2[SIDE_DIR2[c.to_side]] || REV2[depDir] || '?';
+    const fwdDep = linkDeparture(fi.am_volumes, depDir.toLowerCase());
+    const fwdArr = linkArrival(ti.am_volumes, arrDir.toLowerCase());
+    const revDep = linkDeparture(ti.am_volumes, (SIDE_DIR2[c.to_side]||REV2[depDir]||'?').toLowerCase());
+    const revArr = linkArrival(fi.am_volumes, REV2[depDir]?.toLowerCase() || '?');
+    return {
+      from: { int_id: fi.int_id, name: `${fi.ns_street} & ${fi.ew_street}`, port: c.from_side },
+      to:   { int_id: ti.int_id, name: `${ti.ns_street} & ${ti.ew_street}`, port: c.to_side },
+      travel_direction: depDir,
+      am_balance: {
+        forward:  { departure: fwdDep, arrival: fwdArr, diff: fwdDep - fwdArr },
+        reverse:  { departure: revDep, arrival: revArr, diff: revDep - revArr },
+      },
+    };
+  }).filter(Boolean);
+
+  const output = {
+    _instructions: [
+      "This file describes a TMC corridor network for traffic volume balancing.",
+      "canvas_position: pixel coordinates on the canvas — smaller Y = further north, smaller X = further west.",
+      "spatial_rank_n_to_s: 1 = northernmost intersection.",
+      "am_volumes / pm_volumes: turning movement counts keyed by EBL/EBT/EBR/WBL/WBT/WBR/NBL/NBT/NBR/SBL/SBT/SBR.",
+      "links[].am_balance: forward = traffic traveling in travel_direction; diff = departure minus arrival (negative = more arriving than leaving).",
+      "To rebalance: adjust volumes so diffs approach 0. Return changes as a CSV matching the original format: columns EBL,EBT,...SBR with AM (PM) values.",
+    ],
+    project: project.name,
+    intersections: Object.values(intMap),
+    links,
+  };
+
+  const json = JSON.stringify(output, null, 2);
+  const blob = new Blob([json], { type: 'application/json' });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href = url; a.download = (project.name || 'corridor') + '_network.json';
+  a.click(); URL.revokeObjectURL(url);
+  toast('Network exported.');
+}
+
+function exportCSV() {
+  const ints = Object.values(cards).map(c=>c.data).sort((a,b)=>a.sort_order-b.sort_order);
+  if (!ints.length) { toast('No intersections to export.'); return; }
+
+  const headers = ['Intersection','NS_Street','EW_Street',...VOL_FIELDS];
+  const rows = ints.map(d => {
+    const am = d.am_volumes || {}, pm = d.pm_volumes || {};
+    const volCols = VOL_FIELDS.map(f => `${am[f]??'0'} (${pm[f]??'0'})`);
+    return [d.int_id, d.ns_street, d.ew_street, ...volCols];
+  });
+
+  const csv = [headers, ...rows].map(r => r.map(v => `"${String(v).replace(/"/g,'""')}"`).join(',')).join('\n');
+  const blob = new Blob([csv], { type: 'text/csv' });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href = url; a.download = (project?.name || 'corridor') + '_rebalanced.csv';
+  a.click(); URL.revokeObjectURL(url);
+}
+
+// ════════════════════════════════════════════════
+// UPLOAD + SVG POPULATION
+// ════════════════════════════════════════════════
+function openUpload() { if(!project){toast('Open a project first.');return;} document.getElementById('upload-overlay').style.display='flex'; }
+function closeUpload() { document.getElementById('upload-overlay').style.display='none'; document.getElementById('upload-status').textContent=''; }
+
+async function doUpload() {
+  const csvFile = document.getElementById('csv-file').files[0];
+  if (!csvFile) { toast('Select a CSV file.'); return; }
+  const mode = document.querySelector('input[name="upload-mode"]:checked')?.value || 'replace';
+  const status = document.getElementById('upload-status');
+  status.innerHTML = '<span class="spinner"></span> Reading…';
+  try {
+    const rows = parseCSV(await readText(csvFile));
+    status.innerHTML = '<span class="spinner"></span> Saving…';
+    if (mode === 'replace') {
+      if (!confirm('⚠️ Full replace will permanently delete all intersections, volumes, and connectors for this project and cannot be undone. Are you sure?')) return;
+    }
+    if (mode === 'volumes') {
+      const { data: existing } = await sb.from('intersections').select('id,int_id').eq('project_id', project.id);
+      const byIntId = {};
+      (existing || []).forEach(r => { byIntId[String(r.int_id)] = r.id; });
+      let matched = 0, skipped = 0;
+      for (const row of rows) {
+        const intId = String(row['Intersection'] || '');
+        const dbId = byIntId[intId];
+        if (!dbId) { skipped++; continue; }
+        const amVols = {}, pmVols = {};
+        for (const f of VOL_FIELDS) {
+          const { am, pm } = parseAmPm(row[f] || '0 (0)');
+          amVols[f] = am; pmVols[f] = pm;
+        }
+        const { error } = await sb.from('intersections').update({ am_volumes: amVols, pm_volumes: pmVols }).eq('id', dbId);
+        if (error) throw new Error(error.message);
+        if (cards[dbId]) {
+          Object.assign(cards[dbId].data, { am_volumes: amVols, pm_volumes: pmVols });
+          cards[dbId].el.querySelector('.svgholder').innerHTML = svgFor(cards[dbId].data);
+          attachSvgClickHandlers(dbId);
+        }
+        matched++;
+      }
+      redrawConns();
+      status.textContent = `✓ Updated ${matched} intersection${matched!==1?'s':''}${skipped ? ` (${skipped} not matched by ID)` : ''}.`;
+      setTimeout(() => closeUpload(), 1200);
+    } else {
+      await sb.from('connectors').delete().eq('project_id', project.id);
+      await sb.from('intersections').delete().eq('project_id', project.id);
+      const records = rows.map((row, i) => buildRecord(row, i));
+      const { error } = await sb.from('intersections').insert(records);
+      if (error) throw new Error(error.message);
+      status.textContent = `✓ Saved ${records.length} intersections.`;
+      setTimeout(() => { closeUpload(); loadCanvas(); }, 800);
+    }
+  } catch(err) { status.textContent = '✗ ' + err.message; console.error(err); }
+}
+
+function readText(file) {
+  return new Promise((res,rej)=>{ const r=new FileReader(); r.onload=e=>res(e.target.result); r.onerror=rej; r.readAsText(file); });
+}
+
+
+function parseCSV(text) {
+  const lines = text.trim().split(/\r?\n/);
+  const headers = lines[0].split(',').map(h=>h.trim());
+  return lines.slice(1).filter(l=>l.trim()).map(line => {
+    const vals = line.split(',').map(v=>v.trim());
+    const row={}; headers.forEach((h,i)=>row[h]=vals[i]??''); return row;
+  });
+}
+
+function parseAmPm(raw) {
+  const m=raw.trim().match(/^(\d+)\s*\((\d+)\)/); if(m) return {am:m[1],pm:m[2]};
+  const n=raw.trim().match(/^(\d+)$/); if(n) return {am:n[1],pm:n[1]};
+  return {am:'0',pm:'0'};
+}
+
+function buildRecord(row, idx) {
+  const intId=row['Intersection']||String(idx+1), ns=row['NS_Street']||'', ew=row['EW_Street']||'';
+  const amVols={}, pmVols={};
+  for (const f of VOL_FIELDS) {
+    const {am,pm}=parseAmPm(row[f]||'0 (0)');
+    amVols[f]=am; pmVols[f]=pm;
+  }
+  return {
+    project_id:project.id, int_id:intId, ns_street:ns, ew_street:ew,
+    am_volumes:amVols, pm_volumes:pmVols,
+    x:60+(idx*300), y:120, sort_order:idx,
+  };
+}
+
+// ════════════════════════════════════════════════
+// REALTIME
+// ════════════════════════════════════════════════
+let rtChannel=null;
+function subscribeRealtime() {
+  if(rtChannel) sb.removeChannel(rtChannel);
+  rtChannel=sb.channel('proj-'+project.id)
+    .on('postgres_changes',{event:'*',schema:'public',table:'intersections',filter:`project_id=eq.${project.id}`},handleIntChange)
+    .on('postgres_changes',{event:'*',schema:'public',table:'connectors',filter:`project_id=eq.${project.id}`},handleConnChange)
+    .subscribe();
+}
+function handleIntChange({eventType,new:n,old:o}) {
+  if(eventType==='UPDATE'&&cards[n.id]){
+    // Don't let a realtime event interrupt an active rotation drag
+    if (rotatingCardId === n.id) return;
+    cards[n.id].el.style.left=n.x+'px'; cards[n.id].el.style.top=n.y+'px';
+    const { am_volumes, pm_volumes, ...rest } = n;
+    cards[n.id].data = { ...cards[n.id].data, ...rest };
+    // re-apply rotation from DB
+    const rot = cards[n.id].data.rotation || 0;
+    cards[n.id].el.style.transform = rot ? `rotate(${rot}deg)` : '';
+    cards[n.id].el.style.transformOrigin = 'center center';
+    if (!inlineState || inlineState.cardId !== n.id) {
+      cards[n.id].el.querySelector('.svgholder').innerHTML=svgFor(cards[n.id].data);
+      attachSvgClickHandlers(n.id);
+    }
+    redrawConns();
+  }
+  if(eventType==='INSERT'&&!cards[n.id]){ addCard(n); document.getElementById('empty').style.display='none'; }
+  if(eventType==='DELETE'){ cards[o.id]?.el.remove(); delete cards[o.id]; redrawConns(); }
+}
+function handleConnChange({eventType,new:n,old:o}) {
+  if(eventType==='UPDATE'){ const c=conns.find(x=>x.id===n.id); if(c){ Object.assign(c,n); redrawConns(); } }
+  if(eventType==='INSERT'&&!conns.find(c=>c.id===n.id)){ conns.push(n); redrawConns(); }
+  if(eventType==='DELETE'){ conns=conns.filter(c=>c.id!==o.id); redrawConns(); }
+}
+
+// ════════════════════════════════════════════════
+// UTILS
+// ════════════════════════════════════════════════
+function esc(s){ return String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function setHint(msg){ document.getElementById('status-hint').textContent=msg; }
+let toastT;
+function toast(msg){ const el=document.getElementById('toast'); el.textContent=msg; el.classList.add('show'); clearTimeout(toastT); toastT=setTimeout(()=>el.classList.remove('show'),3000); }
+
+// ════════════════════════════════════════════════
+// BOOT
+// ════════════════════════════════════════════════
+showProjPicker();
+</script>
+</body>
+</html>
