@@ -138,7 +138,7 @@ input[type=time]{background:var(--surface2);color:var(--text);border:1px solid v
     <div class="log" id="tmc-log"></div>
     <div class="out-row">
       <button onclick="dlIllustratorCSV()">↓ Illustrator CSV</button>
-      <button onclick="dlSynchroInput()">↓ Synchro Volume Input</button>
+      <button onclick="dlSynchroInput()">↓ Synchro Volume Input (AM + PM)</button>
     </div>
   </div>
 
@@ -348,16 +348,46 @@ function dlIllustratorCSV() {
 
 function dlSynchroInput() {
   if (!tmcResults.length) { toast('No results yet'); return; }
-  // Two rows per intersection: AM volumes and PM volumes
-  const hdr = ['Intersection','Period','NS_Street','EW_Street',...OUT_MOVS];
-  const rows = [hdr];
-  tmcResults.forEach((r,i) => {
-    const amVols = OUT_MOVS.map(m => { const v=r.counts[m]||'0'; const match=v.match(/^(\d+)/); return match?match[1]:'0'; });
-    const pmVols = OUT_MOVS.map(m => { const v=r.counts[m]||'0'; const match=v.match(/\((\d+)\)/); return match?match[1]:'0'; });
-    rows.push([i+1,'AM',r.ns,r.ew,...amVols]);
-    rows.push([i+1,'PM',r.ns,r.ew,...pmVols]);
+
+  const today = new Date();
+  const dateStr = `${today.getMonth()+1}/${today.getDate()}/${today.getFullYear()}`;
+
+  const SYNCHRO_COLS = ['DATE','TIME','INTID','NBL2','NBL','NBT','NBR','NBR2','SBL','SBT','SBR','EBL2','EBL','EBT','EBR','EBR2','WBL2','WBL','WBT','WBR','WBR2','NEL2','NEL','NET','NER','NER2','NWL','NWT','NWR','SEL2','SEL','SET','SER','SER2','SWL2','SWL','SWT','SWR','SWR2'];
+
+  const buildRows = (period, time) => tmcResults.map((r, i) => {
+    const get = m => {
+      const raw = r.counts[m] || '0';
+      if (period === 'am') { const x = raw.match(/^(\d+)/); return x ? x[1] : '0'; }
+      else                 { const x = raw.match(/\((\d+)\)/); return x ? x[1] : '0'; }
+    };
+    const row = {
+      DATE: dateStr, TIME: time, INTID: i + 1,
+      NBL2:'', NBL: get('NBL'), NBT: get('NBT'), NBR: get('NBR'), NBR2:'',
+      SBL: get('SBL'), SBT: get('SBT'), SBR: get('SBR'),
+      EBL2:'', EBL: get('EBL'), EBT: get('EBT'), EBR: get('EBR'), EBR2:'',
+      WBL2:'', WBL: get('WBL'), WBT: get('WBT'), WBR: get('WBR'), WBR2:'',
+      NEL2:'', NEL:'', NET:'', NER:'', NER2:'',
+      NWL:'', NWT:'', NWR:'',
+      SEL2:'', SEL:'', SET:'', SER:'', SER2:'',
+      SWL2:'', SWL:'', SWT:'', SWR:'', SWR2:'',
+    };
+    return SYNCHRO_COLS.map(c => row[c] ?? '').join(',');
   });
-  dlCSV('Synchro_Volume_Input.csv', rows);
+
+  const header1 = 'Turning Movement Count' + ','.repeat(SYNCHRO_COLS.length - 1);
+  const header2 = '60 Minute Counts' + ','.repeat(SYNCHRO_COLS.length - 1);
+  const colRow  = SYNCHRO_COLS.join(',');
+
+  const dl = (content, filename) => {
+    const blob = new Blob([content], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a'); a.href = url; a.download = filename; a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  dl([header1, header2, colRow, ...buildRows('am','800')].join('\n'),  'AM_VOLUME.CSV');
+  dl([header1, header2, colRow, ...buildRows('pm','1700')].join('\n'), 'PM_VOLUME.CSV');
+  toast('Synchro files exported (AM + PM).');
 }
 
 // ── Synchro Parsing ──────────────────────────────────────────────────────────
