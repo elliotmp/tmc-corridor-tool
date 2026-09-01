@@ -1,0 +1,570 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TMC Processor</title>
+<style>
+:root {
+  --bg:#1a1a2e; --surface:#16213e; --surface2:#0f3460;
+  --accent:#e94560; --text:#eaeaea; --muted:#8892a4;
+  --green:#4ade80; --border:#2a2a4a;
+  --danger:#ef4444; --warn:#f59e0b;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(--text);height:100vh;display:flex;flex-direction:column;overflow:hidden;font-size:13px;}
+
+/* Nav */
+#suite-nav{display:flex;align-items:center;background:#0d0d1a;border-bottom:1px solid #1a1a2e;flex-shrink:0;}
+#suite-nav .brand{padding:5px 14px;color:var(--accent);font-weight:700;font-size:12px;border-right:1px solid #1a1a2e;letter-spacing:.5px;}
+#suite-nav a{padding:5px 14px;color:var(--muted);text-decoration:none;font-size:12px;font-weight:600;border-bottom:2px solid transparent;}
+#suite-nav a:hover{color:var(--text);}
+#suite-nav a.active{color:var(--accent);border-bottom-color:var(--accent);}
+
+/* Layout */
+#body{display:flex;flex:1;overflow:hidden;}
+#content{flex:1;overflow-y:auto;padding:20px 24px;max-width:1200px;}
+
+/* Steps */
+.step{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:18px 20px;margin-bottom:14px;}
+.step-header{display:flex;align-items:center;gap:10px;margin-bottom:14px;}
+.step-num{width:26px;height:26px;border-radius:50%;background:var(--surface2);border:2px solid var(--border);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:11px;color:var(--muted);flex-shrink:0;}
+.step-num.done{background:var(--green);border-color:var(--green);color:#000;}
+.step-num.active{border-color:var(--accent);color:var(--accent);}
+.step-title{font-weight:700;font-size:14px;}
+.step-sub{color:var(--muted);font-size:11px;margin-top:2px;}
+
+/* Dropzone */
+.dropzone{border:2px dashed var(--border);border-radius:8px;padding:28px 20px;text-align:center;cursor:pointer;transition:all .15s;color:var(--muted);font-size:12px;}
+.dropzone:hover,.dropzone.over{border-color:var(--accent);color:var(--accent);}
+.dropzone input[type=file]{display:none;}
+
+/* File list */
+.file-list{margin-top:10px;display:flex;flex-direction:column;gap:5px;}
+.file-item{background:var(--surface2);border-radius:5px;padding:6px 10px;display:flex;align-items:center;justify-content:space-between;font-size:11px;}
+.fstatus{color:var(--green);}
+.ferr{color:var(--danger);}
+
+/* Buttons */
+button{background:var(--surface2);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:6px 13px;font-size:12px;cursor:pointer;font-family:inherit;}
+button:hover{background:#1a2a50;}
+button.primary{background:var(--accent);color:#fff;border-color:var(--accent);font-weight:700;}
+button.primary:hover{background:#c73550;}
+button:disabled{opacity:.4;cursor:not-allowed;}
+
+/* Outputs */
+.out-row{display:flex;gap:10px;flex-wrap:wrap;margin-top:12px;}
+
+/* Grid */
+.two-col{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+
+/* Divider */
+.divider{border:none;border-top:1px solid var(--border);margin:20px 0;}
+.section-label{font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.8px;margin-bottom:10px;}
+
+/* Int config */
+.int-config{display:flex;flex-direction:column;gap:7px;margin-top:10px;}
+.int-row{display:flex;align-items:center;gap:10px;background:var(--surface2);border-radius:6px;padding:7px 12px;font-size:12px;}
+.int-name{flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:260px;}
+label{color:var(--muted);font-size:11px;white-space:nowrap;}
+input[type=time]{background:var(--surface2);color:var(--text);border:1px solid var(--border);border-radius:5px;padding:3px 7px;font-size:11px;font-family:inherit;}
+
+/* Log */
+.log{font-size:11px;color:var(--muted);font-family:monospace;max-height:100px;overflow-y:auto;margin-bottom:10px;line-height:1.6;}
+.log .ok{color:var(--green);}
+.log .err{color:var(--danger);}
+
+/* Results preview */
+#results-preview{overflow-x:auto;margin-top:14px;border-radius:6px;}
+#results-preview table{border-collapse:collapse;font-size:11px;font-family:Calibri,sans-serif;}
+#results-preview th,#results-preview td{border:1px solid #555;padding:3px 7px;text-align:center;white-space:nowrap;min-width:44px;}
+#results-preview .int-hdr{text-align:left;font-weight:bold;background:#2a3a5a;color:var(--text);font-size:11px;}
+#results-preview .period{font-weight:bold;background:#1e2e4a;color:var(--text);}
+#results-preview .metric{text-align:left;background:#182035;color:var(--muted);}
+#results-preview .col-hdr{background:#1a2a4a;font-weight:bold;color:var(--muted);}
+
+/* Toast */
+#toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:#1e293b;color:var(--text);padding:9px 18px;border-radius:8px;font-size:12px;opacity:0;transition:opacity .3s;pointer-events:none;z-index:999;}
+#toast.show{opacity:1;}
+</style>
+</head>
+<body>
+
+<div id="suite-nav">
+  <span class="brand">TMC SUITE</span>
+  <a href="index.html">Corridor</a>
+  <a href="tmc.html" class="active">TMC Processor</a>
+</div>
+
+<div id="body">
+<div id="content">
+
+  <!-- ══ Section A: TMC Counts ══ -->
+  <div class="section-label">TMC Counts → Outputs</div>
+
+  <!-- Step 1 -->
+  <div class="step">
+    <div class="step-header">
+      <div class="step-num active" id="sn1">1</div>
+      <div><div class="step-title">Upload TMC Count Files</div>
+      <div class="step-sub">Excel files from Field Works or similar vendors (.xlsx)</div></div>
+    </div>
+    <div class="dropzone" id="dz1" onclick="document.getElementById('fi1').click()">
+      <input type="file" id="fi1" multiple accept=".xlsx,.xls">
+      Drop Excel files here or click to browse
+    </div>
+    <div class="file-list" id="fl1"></div>
+  </div>
+
+  <!-- Step 2 -->
+  <div class="step" id="step2" style="display:none">
+    <div class="step-header">
+      <div class="step-num" id="sn2">2</div>
+      <div><div class="step-title">Review & Configure</div>
+      <div class="step-sub">Override peak start times if needed — leave blank for auto-detect</div></div>
+    </div>
+    <div class="int-config" id="int-config"></div>
+    <div style="margin-top:14px"><button class="primary" onclick="processAll()">Process Files</button></div>
+  </div>
+
+  <!-- Step 3 -->
+  <div class="step" id="step3" style="display:none">
+    <div class="step-header">
+      <div class="step-num" id="sn3">3</div>
+      <div><div class="step-title">TMC Outputs</div>
+      <div class="step-sub">Download files for Illustrator and Synchro</div></div>
+    </div>
+    <div class="log" id="tmc-log"></div>
+    <div class="out-row">
+      <button onclick="dlIllustratorCSV()">↓ Illustrator CSV</button>
+      <button onclick="dlSynchroInput()">↓ Synchro Volume Input</button>
+    </div>
+  </div>
+
+  <hr class="divider">
+
+  <!-- ══ Section B: Synchro Results ══ -->
+  <div class="section-label">Synchro Results → Outputs</div>
+
+  <!-- Step 4 -->
+  <div class="step">
+    <div class="step-header">
+      <div class="step-num active" id="sn4">4</div>
+      <div><div class="step-title">Upload Synchro Reports</div>
+      <div class="step-sub">HCM and/or Queues .txt exports — upload AM and PM separately</div></div>
+    </div>
+    <div class="two-col">
+      <div>
+        <div style="font-size:11px;color:var(--muted);margin-bottom:6px">AM Reports</div>
+        <div class="dropzone" id="dz-am" onclick="document.getElementById('fi-am').click()">
+          <input type="file" id="fi-am" multiple accept=".txt">Drop AM .txt files</div>
+        <div class="file-list" id="fl-am"></div>
+      </div>
+      <div>
+        <div style="font-size:11px;color:var(--muted);margin-bottom:6px">PM Reports</div>
+        <div class="dropzone" id="dz-pm" onclick="document.getElementById('fi-pm').click()">
+          <input type="file" id="fi-pm" multiple accept=".txt">Drop PM .txt files</div>
+        <div class="file-list" id="fl-pm"></div>
+      </div>
+    </div>
+    <div style="margin-top:14px"><button class="primary" onclick="processSynchro()">Parse Reports</button></div>
+  </div>
+
+  <!-- Step 5 -->
+  <div class="step" id="step5" style="display:none">
+    <div class="step-header">
+      <div class="step-num" id="sn5">5</div>
+      <div><div class="step-title">Results Outputs</div>
+      <div class="step-sub">Copy table to Word, or download CSVs for Illustrator</div></div>
+    </div>
+    <div class="out-row">
+      <button class="primary" onclick="copyTable()">Copy Table to Clipboard</button>
+      <button onclick="dlLosCSV()">↓ LOS CSV (Illustrator)</button>
+      <button onclick="dlVolumesCSV()">↓ Volumes CSV</button>
+    </div>
+    <div id="results-preview"></div>
+  </div>
+
+</div>
+</div>
+
+<div id="toast"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
+<script>
+// ── Constants ────────────────────────────────────────────────────────────────
+const RAW_MOVS = ['NL','NT','NR','SL','ST','SR','EL','ET','ER','WL','WT','WR'];
+const MOV_MAP  = {EL:'EBL',ET:'EBT',ER:'EBR',WL:'WBL',WT:'WBT',WR:'WBR',NL:'NBL',NT:'NBT',NR:'NBR',SL:'SBL',ST:'SBT',SR:'SBR'};
+const OUT_MOVS = ['EBL','EBT','EBR','WBL','WBT','WBR','NBL','NBT','NBR','SBL','SBT','SBR'];
+const TBL_MOVS = ['NBL','NBT','NBR','SBL','SBT','SBR','EBL','EBT','EBR','WBL','WBT','WBR'];
+
+// ── State ────────────────────────────────────────────────────────────────────
+let tmcFiles = [], tmcResults = [];
+let amFiles = [], pmFiles = [];
+let synAm = {}, synPm = {};
+
+// ── Helpers ──────────────────────────────────────────────────────────────────
+const esc = s => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+
+function toast(msg, dur=2500) {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), dur);
+}
+
+function dlCSV(name, rows) {
+  const csv = rows.map(r => r.map(v => `"${String(v??'').replace(/"/g,'""')}"`).join(',')).join('\n');
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([csv], {type:'text/csv'}));
+  a.download = name; a.click();
+}
+
+function setupDZ(dzId, fiId, cb) {
+  const dz = document.getElementById(dzId), fi = document.getElementById(fiId);
+  dz.addEventListener('dragover', e => { e.preventDefault(); dz.classList.add('over'); });
+  dz.addEventListener('dragleave', () => dz.classList.remove('over'));
+  dz.addEventListener('drop', e => { e.preventDefault(); dz.classList.remove('over'); cb([...e.dataTransfer.files]); });
+  fi.addEventListener('change', () => { cb([...fi.files]); fi.value=''; });
+}
+
+// ── Excel TMC Parsing ────────────────────────────────────────────────────────
+function getStreetNames(ws) {
+  const r = XLSX.utils.sheet_to_json(ws, {header:1, raw:false, defval:''});
+  return { ns: String(r[4]?.[2]||'').trim(), ew: String(r[6]?.[2]||'').trim() };
+}
+
+function isTime(v) {
+  if (v instanceof Date) return true;
+  if (typeof v === 'number' && v > 0 && v < 1) return true;
+  return false;
+}
+
+function toTimeStr(v) {
+  let h, m;
+  if (v instanceof Date) { h = v.getHours(); m = v.getMinutes(); }
+  else { const tot = Math.round(v*24*60); h = Math.floor(tot/60)%24; m = tot%60; }
+  return `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}`;
+}
+
+function getPeak(ws, forced) {
+  const rows = XLSX.utils.sheet_to_json(ws, {header:1, raw:true, cellDates:true, defval:''});
+  if (rows.length < 13) return null;
+  const hdr = rows[11];
+  const movCols = {};
+  RAW_MOVS.forEach(m => { const i = hdr.findIndex(h => String(h).trim()===m); if(i>=0) movCols[m]=i; });
+  const totalCol = hdr.findIndex(h => String(h).trim()==='TOTAL');
+  const data = rows.slice(12).filter(r => isTime(r[0])).map(r => {
+    const movSum = RAW_MOVS.reduce((s,m) => s+(movCols[m]!==undefined ? parseFloat(r[movCols[m]])||0 : 0), 0);
+    return { tStr: toTimeStr(r[0]), total: totalCol>=0 ? (parseFloat(r[totalCol])||movSum) : movSum, r };
+  });
+  if (data.length < 4) return null;
+  let best = 0;
+  if (forced) { const fi = data.findIndex(d=>d.tStr===forced); if(fi>=0) best=fi; }
+  else { let mx=-1; for(let i=0;i<=data.length-4;i++){const s=data.slice(i,i+4).reduce((a,d)=>a+d.total,0);if(s>mx){mx=s;best=i;}} }
+  const peak = data.slice(best, best+4);
+  const counts = {};
+  RAW_MOVS.forEach(m => { counts[m] = movCols[m]!==undefined ? Math.round(peak.reduce((s,d)=>s+(parseFloat(d.r[movCols[m]])||0),0)) : 0; });
+  return { counts, t: data[best]?.tStr || '' };
+}
+
+async function processFile(file, forcedAm, forcedPm) {
+  const buf = await file.arrayBuffer();
+  const wb = XLSX.read(buf, {type:'array', cellDates:true});
+  const sheets = wb.SheetNames;
+  const amSheet = sheets.find(s=>s.toUpperCase().startsWith('AM'));
+  const pmSheet = sheets.find(s=>s.toUpperCase().startsWith('PM'));
+  const hdrSheet = amSheet || sheets[0];
+  const {ns, ew} = getStreetNames(wb.Sheets[hdrSheet]);
+  const rawToOut = m => Object.keys(MOV_MAP).find(k=>MOV_MAP[k]===m);
+
+  if (amSheet && pmSheet) {
+    const ar = getPeak(wb.Sheets[amSheet], forcedAm||null);
+    const pr = getPeak(wb.Sheets[pmSheet], forcedPm||null);
+    if (!ar||!pr) return null;
+    const counts = {};
+    OUT_MOVS.forEach(om => { const raw=rawToOut(om); counts[om]=`${ar.counts[raw]||0} (${pr.counts[raw]||0})`; });
+    return {ns, ew, am_peak:ar.t, pm_peak:pr.t, counts};
+  }
+  // Single period fallback
+  const ds = sheets.find(s=>['NOON','PEAK HOUR SUMMARY'].includes(s.toUpperCase())) || sheets[0];
+  const sr = getPeak(wb.Sheets[ds], forcedAm||null);
+  if (!sr) return null;
+  const counts = {};
+  OUT_MOVS.forEach(om => { const raw=rawToOut(om); counts[om]=String(sr.counts[raw]||0); });
+  return {ns, ew, am_peak:sr.t, pm_peak:'N/A', counts};
+}
+
+// ── UI: TMC Files ────────────────────────────────────────────────────────────
+setupDZ('dz1','fi1', files => {
+  tmcFiles = [...tmcFiles, ...files.filter(f=>f.name.match(/\.xlsx?$/i))];
+  renderTmcList();
+});
+
+function renderTmcList() {
+  document.getElementById('fl1').innerHTML = tmcFiles.map((f,i)=>`
+    <div class="file-item"><span>${esc(f.name)}</span>
+    <button onclick="tmcFiles.splice(${i},1);renderTmcList()" style="padding:2px 8px;font-size:10px">×</button></div>`).join('');
+  const show = tmcFiles.length > 0;
+  document.getElementById('step2').style.display = show ? '' : 'none';
+  if (show) buildConfig();
+}
+
+function buildConfig() {
+  document.getElementById('int-config').innerHTML = tmcFiles.map((f,i)=>`
+    <div class="int-row">
+      <span class="int-name" title="${esc(f.name)}">${esc(f.name)}</span>
+      <label>AM</label><input type="time" id="am-${i}" step="900">
+      <label>PM</label><input type="time" id="pm-${i}" step="900">
+    </div>`).join('');
+}
+
+async function processAll() {
+  const log = document.getElementById('tmc-log');
+  log.innerHTML = ''; tmcResults = [];
+  document.getElementById('step3').style.display = '';
+  const add = (msg, cls='') => { log.innerHTML += `<span class="${cls}">${msg}</span><br>`; log.scrollTop=9999; };
+  for (let i=0; i<tmcFiles.length; i++) {
+    const f = tmcFiles[i];
+    const am = document.getElementById(`am-${i}`)?.value||null;
+    const pm = document.getElementById(`pm-${i}`)?.value||null;
+    add(`Processing ${f.name}…`);
+    try {
+      const r = await processFile(f, am, pm);
+      if (r) { tmcResults.push({file:f.name,...r}); add(`  ✓ ${r.ns} & ${r.ew} — AM:${r.am_peak} PM:${r.pm_peak}`, 'ok'); }
+      else add(`  ⚠ Could not parse ${f.name}`, 'err');
+    } catch(e) { add(`  ✗ ${e.message}`, 'err'); }
+  }
+  add(`Done — ${tmcResults.length} intersection(s)`);
+  document.getElementById('sn3').className = 'step-num done';
+  toast('TMC processing complete');
+}
+
+function dlIllustratorCSV() {
+  if (!tmcResults.length) { toast('No results yet'); return; }
+  const hdr = ['Intersection','NS_Street','EW_Street','AM_Peak','PM_Peak',...OUT_MOVS];
+  dlCSV('Master_TMC_for_Illustrator.csv', [hdr, ...tmcResults.map((r,i)=>[i+1,r.ns,r.ew,r.am_peak,r.pm_peak,...OUT_MOVS.map(m=>r.counts[m]||'0')])]);
+}
+
+function dlSynchroInput() {
+  if (!tmcResults.length) { toast('No results yet'); return; }
+  // Two rows per intersection: AM volumes and PM volumes
+  const hdr = ['Intersection','Period','NS_Street','EW_Street',...OUT_MOVS];
+  const rows = [hdr];
+  tmcResults.forEach((r,i) => {
+    const amVols = OUT_MOVS.map(m => { const v=r.counts[m]||'0'; const match=v.match(/^(\d+)/); return match?match[1]:'0'; });
+    const pmVols = OUT_MOVS.map(m => { const v=r.counts[m]||'0'; const match=v.match(/\((\d+)\)/); return match?match[1]:'0'; });
+    rows.push([i+1,'AM',r.ns,r.ew,...amVols]);
+    rows.push([i+1,'PM',r.ns,r.ew,...pmVols]);
+  });
+  dlCSV('Synchro_Volume_Input.csv', rows);
+}
+
+// ── Synchro Parsing ──────────────────────────────────────────────────────────
+function cleanVal(v) { return String(v).replace(/^[~#m]+/,'').trim(); }
+
+function parseSynchroText(text) {
+  const lines = text.split('\n').map(l=>l.replace(/\r/g,''));
+  const results = [];
+  let type=null, id='', name='', movements=[], dataRows={};
+
+  const flush = () => {
+    if (id && Object.keys(dataRows).length) results.push({id, name, type, movements, dataRows});
+    id=''; name=''; movements=[]; dataRows={};
+  };
+
+  for (const line of lines) {
+    const t = line.trim();
+    // Section type markers
+    if (t==='Queues')                         { flush(); type='queues'; continue; }
+    if (t.startsWith('HCM 7th Signalized'))   { flush(); type='signalized'; continue; }
+    if (t.startsWith('HCM 7th TWSC'))         { flush(); type='twsc'; continue; }
+    if (t.startsWith('HCM 7th AWSC'))         { flush(); type='awsc'; continue; }
+    // Skip footers/annotations
+    if (!t || t==='Intersection Summary') continue;
+    if (t.includes('Synchro') && t.includes('Report')) continue;
+    if (t.match(/^Page \d/) || t==='Page 0') continue;
+    if (t.match(/^[~#m]\s+[A-Z]/) || t==='Queue shown is maximum after two cycles.') continue;
+    if (!type) continue;
+
+    // Intersection header: "N: Name\tdate"
+    if (!id) {
+      const m = t.match(/^(\d+):\s*(.+?)(?:\t.*)?$/);
+      if (m) { id=m[1]; name=m[2].trim(); continue; }
+    }
+    if (!id) continue;
+
+    const parts = line.split('\t');
+    const label = parts[0].trim();
+    const vals  = parts.slice(1).map(p=>p.trim());
+    if (!label) continue;
+
+    if (label==='Lane Group'||label==='Movement') {
+      movements = vals.filter(v=>v);
+    } else if (movements.length && label) {
+      const row={};
+      movements.forEach((m,i) => { if(m && i<vals.length) row[m]=cleanVal(vals[i]); });
+      dataRows[label]=row;
+    }
+  }
+  flush();
+  return results;
+}
+
+function extractHCM(parsed) {
+  const out={};
+  for (const {id,name,dataRows} of parsed) {
+    const los={}, delay={};
+    OUT_MOVS.forEach(m => {
+      los[m]   = dataRows['LnGrp LOS']?.[m] || dataRows['HCM Lane LOS']?.[m] || '-';
+      delay[m] = dataRows['LnGrp Delay(d), s/veh']?.[m] || dataRows['HCM Ctrl Dly (s/v)']?.[m] || '-';
+    });
+    out[id]={name,los,delay};
+  }
+  return out;
+}
+
+function extractQueues(parsed) {
+  const out={};
+  for (const {id,name,dataRows} of parsed) {
+    const vc={}, delay={}, q50={}, q95={}, flow={};
+    OUT_MOVS.forEach(m => {
+      vc[m]    = dataRows['v/c Ratio']?.[m] || '-';
+      delay[m] = dataRows['Control Delay (s/veh)']?.[m] || dataRows['Total Delay (s/veh)']?.[m] || '-';
+      q50[m]   = dataRows['Queue Length 50th (ft)']?.[m] || '-';
+      q95[m]   = dataRows['Queue Length 95th (ft)']?.[m] || '-';
+      flow[m]  = dataRows['Lane Group Flow (vph)']?.[m] || '-';
+    });
+    out[id]={name,vc,delay,q50,q95,flow};
+  }
+  return out;
+}
+
+async function readText(file) {
+  return new Promise((res,rej)=>{ const fr=new FileReader(); fr.onload=e=>res(e.target.result); fr.onerror=rej; fr.readAsText(file); });
+}
+
+async function parseFileSet(files) {
+  const hcm={}, queues={};
+  for (const f of files) {
+    const text = await readText(f);
+    const parsed = parseSynchroText(text);
+    // Determine dominant type
+    const types = [...new Set(parsed.map(p=>p.type))];
+    if (types.includes('queues')) Object.assign(queues, extractQueues(parsed.filter(p=>p.type==='queues')));
+    if (types.some(t=>t==='signalized'||t==='twsc'||t==='awsc')) Object.assign(hcm, extractHCM(parsed.filter(p=>p.type!=='queues')));
+  }
+  // Merge by ID
+  const out={};
+  const ids = new Set([...Object.keys(hcm),...Object.keys(queues)]);
+  for (const id of ids) {
+    out[id]={
+      name:  (hcm[id]||queues[id])?.name || id,
+      los:   hcm[id]?.los    || {},
+      delay_hcm: hcm[id]?.delay || {},
+      vc:    queues[id]?.vc  || {},
+      delay_q: queues[id]?.delay || {},
+      q50:   queues[id]?.q50 || {},
+      q95:   queues[id]?.q95 || {},
+      flow:  queues[id]?.flow || {},
+    };
+  }
+  return out;
+}
+
+// ── UI: Synchro Files ────────────────────────────────────────────────────────
+setupDZ('dz-am','fi-am', files => { amFiles=[...amFiles,...files.filter(f=>f.name.match(/\.txt$/i))]; renderSynList('am'); });
+setupDZ('dz-pm','fi-pm', files => { pmFiles=[...pmFiles,...files.filter(f=>f.name.match(/\.txt$/i))]; renderSynList('pm'); });
+
+function renderSynList(p) {
+  const arr = p==='am' ? amFiles : pmFiles;
+  document.getElementById(`fl-${p}`).innerHTML = arr.map((f,i)=>`
+    <div class="file-item"><span>${esc(f.name)}</span>
+    <button onclick="${p}Files.splice(${i},1);renderSynList('${p}')" style="padding:2px 8px;font-size:10px">×</button></div>`).join('');
+}
+
+async function processSynchro() {
+  synAm = await parseFileSet(amFiles);
+  synPm = await parseFileSet(pmFiles);
+  buildResultsTable();
+  document.getElementById('step5').style.display='';
+  document.getElementById('sn5').className='step-num done';
+  toast('Synchro reports parsed');
+}
+
+// ── Results Table ────────────────────────────────────────────────────────────
+function buildResultsTable() {
+  const ids = [...new Set([...Object.keys(synAm),...Object.keys(synPm)])].sort((a,b)=>Number(a)-Number(b));
+  let h = `<table>`;
+  // Column headers
+  h += `<tr><td class="col-hdr" colspan="3">Intersection / Period / Metric</td>`;
+  TBL_MOVS.forEach(m => { h += `<td class="col-hdr">${m}</td>`; });
+  h += `</tr>`;
+
+  for (const id of ids) {
+    const am = synAm[id]||{}, pm = synPm[id]||{};
+    const name = am.name||pm.name||id;
+    const hasLos = Object.values({...am.los,...pm.los}).some(v=>v&&v!=='-');
+    const hasVc  = Object.values({...am.vc, ...pm.vc}).some(v=>v&&v!=='-');
+    const hasQ95 = Object.values({...am.q95,...pm.q95}).some(v=>v&&v!=='-');
+
+    h += `<tr><td class="int-hdr" colspan="${3+TBL_MOVS.length}">${esc(id+': '+name)}</td></tr>`;
+
+    const amM = [], pmM = [];
+    if (hasLos) { amM.push(['LOS',am.los||{}]); pmM.push(['LOS',pm.los||{}]); }
+    if (hasVc)  { amM.push(['v/c',am.vc||{}]);  pmM.push(['v/c',pm.vc||{}]); }
+    const ad = Object.keys(am.delay_hcm||{}).length ? am.delay_hcm : am.delay_q||{};
+    const pd = Object.keys(pm.delay_hcm||{}).length ? pm.delay_hcm : pm.delay_q||{};
+    amM.push(['Delay (s)',ad]); pmM.push(['Delay (s)',pd]);
+    if (hasQ95) { amM.push(['95th Q (ft)',am.q95||{}]); pmM.push(['95th Q (ft)',pm.q95||{}]); }
+
+    for (const [period, metrics] of [['AM',amM],['PM',pmM]]) {
+      metrics.forEach(([label,vals],ri) => {
+        h += `<tr>`;
+        if (ri===0) h += `<td class="period" rowspan="${metrics.length}">${period}</td>`;
+        h += `<td class="metric" colspan="2">${label}</td>`;
+        TBL_MOVS.forEach(m => { h += `<td>${esc(vals[m]||'-')}</td>`; });
+        h += `</tr>`;
+      });
+    }
+  }
+  h += `</table>`;
+  document.getElementById('results-preview').innerHTML = h;
+}
+
+async function copyTable() {
+  const tbl = document.querySelector('#results-preview table');
+  if (!tbl) { toast('No table'); return; }
+  // Build clean Word-friendly HTML with inline styles
+  const wordHtml = `<html><body><table border="1" style="border-collapse:collapse;font-family:Calibri,sans-serif;font-size:10pt">${tbl.innerHTML}</table></body></html>`;
+  try {
+    await navigator.clipboard.write([new ClipboardItem({'text/html': new Blob([wordHtml],{type:'text/html'})})]);
+    toast('Table copied — paste into Word');
+  } catch(e) { toast('Copy failed — try selecting the table manually and copying'); }
+}
+
+function dlLosCSV() {
+  const ids = [...new Set([...Object.keys(synAm),...Object.keys(synPm)])].sort((a,b)=>Number(a)-Number(b));
+  const hdr = ['Intersection','NS_Street','EW_Street',...OUT_MOVS];
+  const rows = [hdr,...ids.map(id=>{
+    const am=synAm[id]||{}, pm=synPm[id]||{};
+    const name=am.name||pm.name||id;
+    const [ns,ew]=name.includes('&')?name.split('&').map(s=>s.trim()):[name,''];
+    return [id,ns,ew,...OUT_MOVS.map(m=>`${am.los?.[m]||'-'} (${pm.los?.[m]||'-'})`)];
+  })];
+  dlCSV('LOS_for_Illustrator.csv', rows);
+}
+
+function dlVolumesCSV() {
+  const ids = [...new Set([...Object.keys(synAm),...Object.keys(synPm)])].sort((a,b)=>Number(a)-Number(b));
+  const hdr = ['Intersection','NS_Street','EW_Street',...OUT_MOVS];
+  const rows = [hdr,...ids.map(id=>{
+    const am=synAm[id]||{}, pm=synPm[id]||{};
+    const name=am.name||pm.name||id;
+    const [ns,ew]=name.includes('&')?name.split('&').map(s=>s.trim()):[name,''];
+    return [id,ns,ew,...OUT_MOVS.map(m=>`${am.flow?.[m]||'-'} (${pm.flow?.[m]||'-'})`)];
+  })];
+  dlCSV('Volumes.csv', rows);
+}
+</script>
+</body>
+</html>
