@@ -342,8 +342,8 @@ async function processAll() {
 
 function dlIllustratorCSV() {
   if (!tmcResults.length) { toast('No results yet'); return; }
-  const hdr = ['Intersection','NS_Street','EW_Street','AM_Peak','PM_Peak',...OUT_MOVS];
-  dlCSV('Master_TMC_for_Illustrator.csv', [hdr, ...tmcResults.map((r,i)=>[i+1,r.ns,r.ew,r.am_peak,r.pm_peak,...OUT_MOVS.map(m=>r.counts[m]||'0')])]);
+  const hdr = ['Intersection','NS_Street','EW_Street',...OUT_MOVS];
+  dlCSV('Master_TMC_for_Illustrator.csv', [hdr, ...tmcResults.map((r,i)=>[i+1,r.ns,r.ew,...OUT_MOVS.map(m=>r.counts[m]||'0')])]);
 }
 
 function dlSynchroInput() {
